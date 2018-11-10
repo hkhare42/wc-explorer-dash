@@ -1,0 +1,179 @@
+body {
+	background-color: rgb(255, 0, 144);
+}
+
+#bodydiv{
+	width: 50vw;
+	height: 50vh;
+}
+
+header {
+	position: absolute;
+	top:0vh;
+	left:0vw;
+	z-index:10;
+}
+
+details{
+	position: absolute;
+	width: 100vw;
+	height:3vh;
+}
+
+summary{
+	font-family: 'Bebas Neue', Roboto Condensed, Roboto, Helvetica Narrow, Arial Narrow, Helvetica, Arial;
+	font-size: 2.5vh;
+	cursor: pointer;
+	outline: none;
+}
+
+h1 {
+	font-family: 'Soccer League';
+	font-size: 8vh;
+	text-align: center;
+	margin: 0%;
+}
+
+h2 {
+	font-family: 'Bebas Neue', Roboto Condensed, Roboto, Helvetica Narrow, Arial Narrow, Helvetica, Arial;
+	font-size: 4vh;
+	text-align: center;
+	margin: 0%;}
+
+#infopanel{
+	width: 100vw;
+}
+
+p{
+	text-align: center;
+}
+
+p.para{
+	margin:0;
+	width: 40vw;
+	margin-left: 30vw;
+	margin-right: 30vw;
+	font-size:2vh;
+}
+
+p.paraheader{
+	margin:0%;
+	width: 40vw;
+	margin-left: 30vw;
+	margin-right: 30vw;
+	font-weight:bold;
+	font-size:2.5vh;
+}
+
+ul{
+   margin:0%;
+}
+
+footer {
+	position: absolute;
+	bottom: 3vh;
+	left:0vw;
+	z-index: 10;
+}
+
+div.graph {}
+
+#container {
+	width: 100vw;
+	height:94vh;
+	position:absolute;
+	top:3vh;
+	left:0vw;
+}
+
+#xg_plot {
+	height: 43vh;
+	width: 48vw;
+	position: absolute;
+	top:0vh;
+	left:0vh;	
+}
+
+#player_profile {
+	height: 25vh;
+	width: 20vw;
+	right: 30vw;
+	top: 1vh;
+	position:absolute;
+}
+
+#player_profile2 {
+	height: 25vh;
+	width: 20vw;
+	right: 4vw;
+	top: 1vh;
+	position:absolute;
+}
+
+#shot_plot {
+	height: 51vh;
+	width: 23vw;
+	left: 0vh;
+	bottom:0vh; 
+	position:absolute;
+}
+
+#spider {
+	height: 51vh;
+	width: 25vw;
+	left: 23vw;
+	bottom:0vh; 
+	position:absolute;
+}
+
+
+#pass_map {
+	height: 67vh;
+	width: 52vw;
+	right: 0vh;
+	bottom:0vh;
+	position:absolute;
+}
+
+._dash-undo-redo {
+  display: none;
+}
+
+.modebar-group {
+	background-color: rgba(128, 128, 128, 0.5);
+}
+
+#match_dropdown{
+	color:rgb(57, 57, 57);
+}
+
+.Select{
+	width:40vw;
+	margin-left:30vw;
+	margin-right:30vw;
+	text-align: center;
+	font-family: 'Bebas Neue', Roboto Condensed, Roboto, Helvetica Narrow, Arial Narrow, Helvetica, Arial;
+	font-size: 3vh;
+}
+
+.Select-control{
+	background-color: transparent;
+}
+
+#react-select-2--value-item{
+	color:rgb(128, 128, 128);
+}
+
+#theme_switcher{
+	font-family: 'Bebas Neue', Roboto Condensed, Roboto, Helvetica Narrow, Arial Narrow, Helvetica, Arial;
+	font-size: 3vh;
+	background-color:transparent;
+	width:20vw;
+	margin-left:40vw;
+	margin-right:40vw;
+	margin-bottom:1vh;
+}
+
+a, a:active, a:focus {
+   outline: none;
+}
