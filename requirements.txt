@@ -1,0 +1,8 @@
+numpy
+pandas
+plotly
+dash==0.29.0  # The core dash backend
+dash-html-components==0.13.2  # HTML components
+dash-core-components==0.38.0  # Supercharged components
+dash-table==3.1.5
+dash-renderer==0.9.0
