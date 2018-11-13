@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import json
 import time
 
@@ -149,7 +151,7 @@ def create_xg_plot(shots_df, events, top_xg, match_info, theme):
 
     shot_trace_1 = go.Scatter(
                         x = shots_df[(shots_df.outcome == 'Goal') & (shots_df.team == match_info['teams']['home'])].dec_time,
-                        y = shots_df[(shots_df.outcome == 'Goal') & (shots_df.team == match_info['teams']['home'])].cum_xg + 0.15,
+                        y = shots_df[(shots_df.outcome == 'Goal') & (shots_df.team == match_info['teams']['home'])].cum_xg + (shots_df.cum_xg.max() * 0.083),
                         mode = 'markers',
                         marker = {
                                 'size': 10,
@@ -164,7 +166,7 @@ def create_xg_plot(shots_df, events, top_xg, match_info, theme):
 
     shot_trace_2 = go.Scatter(
                         x = shots_df[(shots_df.outcome == 'Goal') & (shots_df.team == match_info['teams']['away'])].dec_time,
-                        y = shots_df[(shots_df.outcome == 'Goal') & (shots_df.team == match_info['teams']['away'])].cum_xg + 0.15,
+                        y = shots_df[(shots_df.outcome == 'Goal') & (shots_df.team == match_info['teams']['away'])].cum_xg + (shots_df.cum_xg.max() * 0.083),
                         mode = 'markers',
                         marker = {
                                 'size': 10,
@@ -1215,6 +1217,7 @@ how_is_it_worked_out = (
     "account when assessing the quality of a chance include:")
 
 app = dash.Dash(__name__)
+server = app.server
 
 app.css.append_css({"external_url": "https://codepen.io/hkhare42/pen/eQzWNy.css"})
 
@@ -1787,7 +1790,7 @@ def update_spider(events, shots_df, passing_df, match_info, theme):
     return create_spider_chart(events, shots_df, passing_df, match_info, theme)
 
 if __name__ == '__main__':
-    app.run_server(
+    application.run(
             debug=True, 
-            host='0.0.0.0'
+            port = 8080
         )
