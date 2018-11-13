@@ -194,7 +194,7 @@ def create_xg_plot(shots_df, events, top_xg, match_info, theme):
     #         font = {'size': 30},
             legend =  {
                 'orientation': 'h',
-                'y': 0.98, 'x': 0.1, 
+                'y': 0.99, 'x': 0.1, 
                 'xanchor': 'center',
                 'font': {
 #                         'size': 50,
@@ -257,7 +257,7 @@ def create_xg_plot(shots_df, events, top_xg, match_info, theme):
         # },
         {
                 'x': 0.47,
-                'y': 0.98,
+                'y': 0.99,
                 'xref': 'paper',
                 'yref': 'paper',
                 'showarrow': False,
@@ -381,7 +381,7 @@ def create_shot_plot(shots_df, match_info, theme):
         'paper_bgcolor': graph_styles[theme]['bg_color'],
         'legend': {
                 'orientation': 'h',
-                'y': 1.08, 'x': 0.5, 
+                'y': 1.09, 'x': 0.5, 
                 'xanchor': 'center',
                 'font': {
     #                     'size': 50,
