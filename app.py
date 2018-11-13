@@ -194,7 +194,7 @@ def create_xg_plot(shots_df, events, top_xg, match_info, theme):
     #         font = {'size': 30},
             legend =  {
                 'orientation': 'h',
-                'y': 0.92, 'x': 0.1, 
+                'y': 0.98, 'x': 0.1, 
                 'xanchor': 'center',
                 'font': {
 #                         'size': 50,
@@ -213,7 +213,7 @@ def create_xg_plot(shots_df, events, top_xg, match_info, theme):
         ),
         yaxis=dict(
             title = 'Expected Goals (xG)',
-            domain = [0, 0.8],
+            domain = [0, 0.9],
             color = graph_styles[theme]['axis_color'],
             gridcolor = graph_styles[theme]['grid_color'],
     #         tickfont = {'size': 20}
@@ -227,7 +227,7 @@ def create_xg_plot(shots_df, events, top_xg, match_info, theme):
     #         tickfont = {'size': 20}
         ),
         yaxis2=dict(
-            domain=[0.05, 0.75],
+            domain=[0.05, 0.85],
             anchor='x2',
             title='Total Expected Goals (xG)',
             color = graph_styles[theme]['axis_color'],
@@ -242,22 +242,22 @@ def create_xg_plot(shots_df, events, top_xg, match_info, theme):
         },
         hovermode = 'closest',
         annotations = [
+        # {
+        #         'x': 0.5,
+        #         'y': 1.0,
+        #         'xref': 'paper',
+        #         'yref': 'paper',
+        #         'showarrow': False,
+        #         'font': {
+        #                 'family': graph_styles[theme]['titlefont']['family'],
+        #                 'size': graph_styles[theme]['titlefont']['size'],
+        #                 'color': graph_styles[theme]['titlefont']['color'],
+        #         },
+        #         'text': 'EXPECTED GOALS (xG) CHART',
+        # },
         {
-                'x': 0.5,
-                'y': 1.0,
-                'xref': 'paper',
-                'yref': 'paper',
-                'showarrow': False,
-                'font': {
-                        'family': graph_styles[theme]['titlefont']['family'],
-                        'size': graph_styles[theme]['titlefont']['size'],
-                        'color': graph_styles[theme]['titlefont']['color'],
-                },
-                'text': 'EXPECTED GOALS (xG) CHART',
-        },
-        {
-                'x': 0.5,
-                'y': 0.875,
+                'x': 0.47,
+                'y': 0.98,
                 'xref': 'paper',
                 'yref': 'paper',
                 'showarrow': False,
@@ -397,26 +397,26 @@ def create_shot_plot(shots_df, match_info, theme):
     #     'height': 800,
     #     'width': 2500,
         'margin' : {
-            't': 60,
+            't': 20,
             'r': 5,
             'l': 5,
             'b': 5
         },
-        'annotations': [
-                {
-                        'x': 0.5,
-                        'y': 1.18,
-                        'xref': 'paper',
-                        'yref': 'paper',
-                        'showarrow': False,
-                        'font': {
-                                'family': graph_styles[theme]['titlefont']['family'],
-                                'size': graph_styles[theme]['titlefont']['size'],
-                                'color': graph_styles[theme]['titlefont']['color'],
-                        },
-                        'text': 'SHOT PLOT',
-                },
-        ]
+        # 'annotations': [
+        #         {
+        #                 'x': 0.5,
+        #                 'y': 1.18,
+        #                 'xref': 'paper',
+        #                 'yref': 'paper',
+        #                 'showarrow': False,
+        #                 'font': {
+        #                         'family': graph_styles[theme]['titlefont']['family'],
+        #                         'size': graph_styles[theme]['titlefont']['size'],
+        #                         'color': graph_styles[theme]['titlefont']['color'],
+        #                 },
+        #                 'text': 'SHOT PLOT',
+        #         },
+        # ]
         # 'title': 'MATCH SHOT CHART'
     }
     
@@ -595,7 +595,7 @@ def create_spider_chart(events, shots_df, passing_df, match_info, theme):
                       margin = {
                           'l': 10,
                           'r': 10,
-                          't': 60,
+                          't': 20,
                           'b': 10,
                       },
                     plot_bgcolor = graph_styles[theme]['bg_color'],
@@ -624,19 +624,19 @@ def create_spider_chart(events, shots_df, passing_df, match_info, theme):
                             'color': graph_styles[theme]['titlefont']['color'],
                             },
                     annotations = [
-                    {
-                            'x': 0.5,
-                            'y': 1.18,
-                            'xref': 'paper',
-                            'yref': 'paper',
-                            'showarrow': False,
-                            'font': {
-                                    'family': graph_styles[theme]['titlefont']['family'],
-                                    'size': graph_styles[theme]['titlefont']['size'],
-                                    'color': graph_styles[theme]['titlefont']['color'],
-                            },
-                            'text': 'TEAM PERFORMANCE RADAR',
-                    },
+                    # {
+                    #         'x': 0.5,
+                    #         'y': 1.18,
+                    #         'xref': 'paper',
+                    #         'yref': 'paper',
+                    #         'showarrow': False,
+                    #         'font': {
+                    #                 'family': graph_styles[theme]['titlefont']['family'],
+                    #                 'size': graph_styles[theme]['titlefont']['size'],
+                    #                 'color': graph_styles[theme]['titlefont']['color'],
+                    #         },
+                    #         'text': 'TEAM PERFORMANCE RADAR',
+                    # },
                     {
                             'x': 1,
                             'y': 1,
@@ -1052,24 +1052,24 @@ def create_passing_network_map(passing_df, location_df, starting, match_info, th
         'margin': {
             'l': 0,
             'r': 0,
-            't': 40,
+            't': 0,
             'b': 0,
         },
-        'annotations': [
-                {
-                        'x': 0.5,
-                        'y': 1.08,
-                        'xref': 'paper',
-                        'yref': 'paper',
-                        'showarrow': False,
-                        'font': {
-                                'family': graph_styles[theme]['titlefont']['family'],
-                                'size': graph_styles[theme]['titlefont']['size'],
-                                'color': graph_styles[theme]['titlefont']['color'],
-                        },
-                        'text': 'PASSING NETWORK MAPS',
-                },
-        ],
+        # 'annotations': [
+        #         {
+        #                 'x': 0.5,
+        #                 'y': 1.08,
+        #                 'xref': 'paper',
+        #                 'yref': 'paper',
+        #                 'showarrow': False,
+        #                 'font': {
+        #                         'family': graph_styles[theme]['titlefont']['family'],
+        #                         'size': graph_styles[theme]['titlefont']['size'],
+        #                         'color': graph_styles[theme]['titlefont']['color'],
+        #                 },
+        #                 'text': 'PASSING NETWORK MAPS',
+        #         },
+        # ],
     #     'legend': {
     #             'orientation': 'h',
     #             'y': 1.05, 'x': 0.5, 
@@ -1266,7 +1266,11 @@ app.layout = html.Div(id='bodydiv', children = [
                                         dcc.Graph(className='graph', id='player_profile2', config={'displayModeBar': False}),
                                         dcc.Graph(className='graph', id='pass_map', config={'modeBarButtons': [['zoom2d','pan2d','resetViews']], 'displaylogo':False}),
                                         dcc.Graph(className='graph', id='shot_plot', config={'modeBarButtons': [['zoom2d','resetViews']], 'displaylogo':False}),
-                                        dcc.Graph(className='graph', id='spider', config={'displayModeBar': False})
+                                        dcc.Graph(className='graph', id='spider', config={'displayModeBar': False}),
+                                        html.H3(id='xg_header', children='EXPECTED GOALS (xG) CHART'),
+                                        html.H3(id='shotplot_header', children='SHOT PLOT'),
+                                        html.H3(id='spider_header', children='TEAM PERFORMANCE RADAR'),
+                                        html.H3(id='passing_network_header', children='PASSING NETWORK MAPS'),
                                         ]),
                     html.Footer(
                             html.Details(id='details_footer', 
@@ -1314,7 +1318,7 @@ def update_theme(n_clicks):
 @app.callback(
             Output('details_header', 'style'),
             [Input('theme_div', 'children')])
-def update_theme(theme):
+def update_theme_header(theme):
     if theme == 'light':
         color = 'rgb(203, 203, 203)'
     else:
@@ -1324,7 +1328,7 @@ def update_theme(theme):
 @app.callback(
             Output('details_footer', 'style'),
             [Input('theme_div', 'children')])
-def update_theme(theme):
+def update_theme_footer(theme):
     if theme == 'light':
         color = 'rgb(203, 203, 203)'
     else:
@@ -1334,39 +1338,63 @@ def update_theme(theme):
 @app.callback(
             Output('app_title', 'style'),
             [Input('theme_div', 'children')])
-def update_theme(theme):
+def update_theme_title(theme):
     return {'backgroundColor':graph_styles[theme]['color']}
 
 @app.callback(
             Output('match_header', 'style'),
             [Input('theme_div', 'children')])
-def update_theme(theme):
+def update_theme_match_header(theme):
     return {'backgroundColor':graph_styles[theme]['color']}
 
 @app.callback(
             Output('infopanel', 'style'),
             [Input('theme_div', 'children')])
-def update_theme(theme):
+def update_theme_infopanel(theme):
     return {'backgroundColor':graph_styles[theme]['color']}
 
 @app.callback(
             Output('ref_list', 'style'),
             [Input('theme_div', 'children')])
-def update_theme(theme):
+def update_theme_reflist(theme):
     return {'backgroundColor':graph_styles[theme]['color']}
 
 @app.callback(
             Output('container', 'style'),
             [Input('theme_div', 'children')])
-def update_theme(theme):
+def update_theme_container(theme):
     return {'backgroundColor':graph_styles[theme]['bg_color']}
 
 @app.callback(
             Output('theme_switcher', 'style'),
             [Input('theme_div', 'children')])
-def update_theme(theme):
+def update_theme_switcher(theme):
     return {'color':graph_styles[theme]['bg_color'], 
             'borderColor':graph_styles[theme]['bg_color']}
+
+@app.callback(
+            Output('xg_header', 'style'),
+            [Input('theme_div', 'children')])
+def update_heading_colors(theme):
+    return {'color':graph_styles[theme]['color']}
+
+@app.callback(
+            Output('shotplot_header', 'style'),
+            [Input('theme_div', 'children')])
+def update_heading_colors(theme):
+    return {'color':graph_styles[theme]['color']}
+
+@app.callback(
+            Output('spider_header', 'style'),
+            [Input('theme_div', 'children')])
+def update_heading_colors(theme):
+    return {'color':graph_styles[theme]['color']}
+
+@app.callback(
+            Output('passing_network_header', 'style'),
+            [Input('theme_div', 'children')])
+def update_heading_colors(theme):
+    return {'color':graph_styles[theme]['color']}
 
 @app.callback(
             Output('match_info_div', 'children'),
@@ -1790,7 +1818,7 @@ def update_spider(events, shots_df, passing_df, match_info, theme):
     return create_spider_chart(events, shots_df, passing_df, match_info, theme)
 
 if __name__ == '__main__':
-    application.run(
+    app.run_server(
             debug=True, 
             port = 8080
         )

@@ -40,6 +40,42 @@ h2 {
 	text-align: center;
 	margin: 0%;}
 
+h3 {
+	font-family: 'Bebas Neue', Roboto Condensed, Roboto, Helvetica Narrow, Arial Narrow, Helvetica, Arial;
+	font-size: 3.4vh;
+	text-align: center;
+	margin: 0%;
+    font-weight: normal;
+    height: 4vh;
+    position: absolute;
+    padding-top: 0.3vh;
+    background-color:transparent;
+    }
+
+#xg_header{
+	width: 48vw;
+	top:0vh;
+	left:0vh;	
+}
+
+#shotplot_header{
+	width: 23vw;
+	left: 0vh;
+	top:43vh; 
+}
+
+#spider_header{
+	width: 25vw;
+	left: 23vw;
+	top:43vh; 
+}
+
+#passing_network_header{
+	width: 52vw;
+	right: 0vh;
+	bottom:63vh;
+}
+
 #infopanel{
 	width: 100vw;
 }
@@ -87,10 +123,10 @@ div.graph {}
 }
 
 #xg_plot {
-	height: 43vh;
+	height: 39vh;
 	width: 48vw;
 	position: absolute;
-	top:0vh;
+	top:4vh;
 	left:0vh;	
 }
 
@@ -98,7 +134,7 @@ div.graph {}
 	height: 25vh;
 	width: 20vw;
 	right: 30vw;
-	top: 1vh;
+	top: 0.5vh;
 	position:absolute;
 }
 
@@ -106,12 +142,12 @@ div.graph {}
 	height: 25vh;
 	width: 20vw;
 	right: 4vw;
-	top: 1vh;
+	top: 0.5vh;
 	position:absolute;
 }
 
 #shot_plot {
-	height: 51vh;
+	height: 47vh;
 	width: 23vw;
 	left: 0vh;
 	bottom:0vh; 
@@ -119,7 +155,7 @@ div.graph {}
 }
 
 #spider {
-	height: 51vh;
+	height: 47vh;
 	width: 25vw;
 	left: 23vw;
 	bottom:0vh; 
@@ -128,7 +164,7 @@ div.graph {}
 
 
 #pass_map {
-	height: 67vh;
+	height: 63vh;
 	width: 52vw;
 	right: 0vh;
 	bottom:0vh;
