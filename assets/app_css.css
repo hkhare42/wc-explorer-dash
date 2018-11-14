@@ -240,3 +240,7 @@ td{
 a, a:active, a:focus {
    outline: none;
 }
+
+a:link, a:visited {
+    color: rgb(128, 128, 128);
+}

@@ -1225,6 +1225,8 @@ how_is_it_worked_out = (
 app = dash.Dash(__name__)
 server = app.server
 
+app.title = 'WC 2018 MATCH EXPLORER'
+
 app.css.append_css({"external_url": "https://codepen.io/hkhare42/pen/eQzWNy.css"})
 
 app.layout = html.Div(id='bodydiv', children = [
@@ -1291,9 +1293,25 @@ app.layout = html.Div(id='bodydiv', children = [
                                 html.Ul(id='ref_list', children= [
                                 html.Li([
                                         'Data used for this analytical piece was made available by Statsbomb: ',
-                                        html.A(href='https://statsbomb.com/data/', children='Link')
-                                        ], id='referlinks'),
-                                html.Li('Visuals inspired by multiple works in the community: Tegen 11, StatsBomb, Colin Trainor, Ben Mayhew.'),
+                                        html.A(href='https://statsbomb.com/data/', target="_blank", children='Link to Data')
+                                        ]),
+                                html.Li([
+                                        'More information about this dashboard can be found at my blog post here: ',
+                                        html.A(href='https://datadabble.blogspot.com/2018/11/fifa-world-cup-2018-match-explorer.html', target="_blank", children='Link to Blog Post')
+                                        ]),
+                                html.Li([
+                                        'Code used for creating this dashboard is available on GitHub: ',
+                                        html.A(href='https://github.com/hkhare42/wc-explorer-dash', target="_blank", children='Link to GitHub repo')
+                                        ]),
+                                html.Li([
+                                        'Find out more about Expected Goals (xG) in this BBC article here: ',
+                                        html.A(href='https://www.bbc.com/sport/football/40699431', target="_blank", children='Link to BBC Page')
+                                        ]),
+                                html.Li([
+                                        'Learn more about xG-contribution and xG-buildup here: ',
+                                        html.A(href='https://statsbomb.com/2018/08/introducing-xgchain-and-xgbuildup/', target="_blank", children='Link to Statsbomb article')
+                                        ]),
+                                html.Li('Visuals inspired by multiple works made by the football analytics community on Twitter.'),
                                 html.Li("All analysis was carried out using Python data stack. Visualization realized with the help of Plotly's Dash framework."),
                                         ])
                                 ])),
