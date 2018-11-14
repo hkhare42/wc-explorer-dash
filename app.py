@@ -13,6 +13,7 @@ import plotly.graph_objs as go
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
+import dash_table as table
 
 from dash.dependencies import Input, Output
 
@@ -38,6 +39,7 @@ graph_styles = {
             'color': 'rgb(68, 68, 68)'
         },
         'axis_color': 'rgb(68, 68, 68)',
+        'profile_color': 'rgb(80, 80, 80)',
         'legendfont': {
             'color': 'rgb(68, 68, 68)'
         },
@@ -53,6 +55,7 @@ graph_styles = {
             'color': 'rgb(255, 255, 255)'
         },
         'axis_color': 'rgb(180, 180, 180)',
+        'profile_color': 'rgb(170, 170, 170)',
         'legendfont': {
             'color': 'rgb(180, 180, 180)'
         },
@@ -1154,7 +1157,7 @@ def create_player_profile(pass_angles, player_name, match_info, theme):
                           },
                           'domain':{
                               'x': [0.5, 1],
-                              'y': [0, 1]
+                              'y': [0.05, 0.95]
                           }
                       },
                       showlegend = False,
@@ -1163,20 +1166,23 @@ def create_player_profile(pass_angles, player_name, match_info, theme):
                       margin = {
                           'l': 0,
                           'r': 0,
-                          't': 50,
+                          't': 0,
                           'b': 0,
                       },
                      annotations=[
                              {
                                 'text': '{}'.format(player_name),
-                                'x': 0.5,
-                                'y': 1.15,
+                                'x': 0.25,
+                                'y': 0,
                                 'xref': 'paper',
                                 'yref': 'paper',
                                 'showarrow': False,
+                                'xanchor': 'center',
+                                'yanchor': 'bottom',
                                 'font':{
-                                    'color': 'black' if theme=='light' else 'white',
-                                    'size': 14,
+                                    'color': graph_styles[theme]['profile_color'],
+                                    'size': 20,
+                                    'family': graph_styles[theme]['titlefont']['family']
                                 }
                              },
                      ],
@@ -1188,9 +1194,9 @@ def create_player_profile(pass_angles, player_name, match_info, theme):
                          'yanchor': 'bottom',
                          'xanchor': 'left',
                          'x': 0.05,
-                         'y': 0.05,
+                         'y': 0.15,
                          'sizex': 0.4,
-                         'sizey': 0.9,
+                         'sizey': 0.7,
                          'sizing': 'stretch'
                      }])
     
@@ -1263,13 +1269,19 @@ app.layout = html.Div(id='bodydiv', children = [
                     html.Div(id='container', children=[
                                         dcc.Graph(className='graph', id='xg_plot', relayoutData={}, config={'modeBarButtons': [['zoom2d','resetViews']], 'displaylogo':False}),
                                         dcc.Graph(className='graph', id='player_profile', config={'displayModeBar': False}),
-                                        dcc.Graph(className='graph', id='player_profile2', config={'displayModeBar': False}),
+                                        # table.DataTable(id='player_profile2', columns=[{'name': 'name', 'id': 'name'}, {'name': 'team', 'id': 'team'}, 
+                                        #                                                 {'name': 'total_xg', 'id': 'total_xg'}, {'name': 'shots', 'id': 'shots'}],
+                                        #                 style_cell={'font-size':'2.5vh', 'fontFamily':'Bebas Neue', 'height':'4vh', 'color': 'rgb(180, 180, 180)', 'backgroundColor': 'rgb(57, 57, 57)'},
+                                        #                 style_table={},
+                                        #                 style_as_list_view=True),
+                                        html.Table(id='player_profile2'),
                                         dcc.Graph(className='graph', id='pass_map', config={'modeBarButtons': [['zoom2d','pan2d','resetViews']], 'displaylogo':False}),
                                         dcc.Graph(className='graph', id='shot_plot', config={'modeBarButtons': [['zoom2d','resetViews']], 'displaylogo':False}),
                                         dcc.Graph(className='graph', id='spider', config={'displayModeBar': False}),
                                         html.H3(id='xg_header', children='EXPECTED GOALS (xG) CHART'),
                                         html.H3(id='shotplot_header', children='SHOT PLOT'),
                                         html.H3(id='spider_header', children='TEAM PERFORMANCE RADAR'),
+                                        html.H3(id='player_profile_header', children='PLAYER PROFILE'),
                                         html.H3(id='passing_network_header', children='PASSING NETWORK MAPS'),
                                         ]),
                     html.Footer(
@@ -1289,6 +1301,7 @@ app.layout = html.Div(id='bodydiv', children = [
                     html.Div(id='match_info_div', style={'display': 'none'}),
                     html.Div(id='shots_div', style={'display': 'none'}),
                     html.Div(id='passing_div', style={'display': 'none'}),
+                    html.Div(id='stats_div', style={'display': 'none'}),
                     html.Div(id='location_div', style={'display': 'none'}),
                     html.Div(id='starting_div', style={'display': 'none'}),
                     html.Div(id='top_xg_div', style={'display': 'none'}),
@@ -1397,6 +1410,19 @@ def update_heading_colors(theme):
     return {'color':graph_styles[theme]['color']}
 
 @app.callback(
+            Output('player_profile_header', 'style'),
+            [Input('theme_div', 'children')])
+def update_heading_colors(theme):
+    return {'color':graph_styles[theme]['color']}
+
+@app.callback(
+            Output('player_profile2', 'style'),
+            [Input('theme_div', 'children')])
+def update_table_colors(theme):
+    return {'color':graph_styles[theme]['profile_color']}
+
+
+@app.callback(
             Output('match_info_div', 'children'),
             [Input('match_dropdown', 'value')])
 def update_match_info(match_id):
@@ -1469,6 +1495,7 @@ def update_shots_data(events, match_info):
     shots_df = pd.DataFrame(
         list(zip(
             shots.player.apply(lambda x: x['name']),
+            shots.player.apply(lambda x: x['id']),
             shots.team.apply(lambda x: x['name']),
             shots.period,
             shots.minute,
@@ -1479,14 +1506,17 @@ def update_shots_data(events, match_info):
             shots.shot.apply(lambda x: x['outcome']['name']),
             shots.shot.apply(lambda x: x['body_part']['name']),
             shots.shot.apply(lambda x: x['technique']['name']),
-        )), columns=['name','team','period','minute','seconds','location','xg',
-                     'end_location','outcome','body_part','technique'])
+            shots.possession,
+            shots.id
+        )), columns=['name','id','team','period','minute','seconds','location','xg',
+                     'end_location','outcome','body_part','technique', 'possession', 'shot_id'])
     
     og = events[events.type.apply(lambda x: x['name']) == 'Own Goal Against']
 
     og_df = pd.DataFrame(
         list(zip(
             og.player.apply(lambda x: x['name']),
+            og.player.apply(lambda x: x['id']),
             og.team.apply(lambda x: list(set(match_info['teams'].values()) - {x['name']})[0]),
             og.period,
             og.minute,
@@ -1497,8 +1527,9 @@ def update_shots_data(events, match_info):
             ['Goal'] * og.shape[0],
             ['Unknown'] * og.shape[0],
             ['Unknown'] * og.shape[0],
-        )), columns=['name','team','period','minute','seconds','location','xg',
-                     'end_location','outcome','body_part','technique'])
+            og.possession
+        )), columns=['name','id','team','period','minute','seconds','location','xg',
+                     'end_location','outcome','body_part','technique','possession'])
 
     shots_df = pd.concat([shots_df, og_df], ignore_index=True, sort=False)
 
@@ -1555,14 +1586,72 @@ def update_passing_data(events):
                         passing['pass'].apply(lambda x: x['length']),
                         passing['pass'].apply(lambda x: (x['angle'] * 180) / 3.14),
                         passing['pass'].apply(lambda x: x.get('cross', 0)),
+                        passing['pass'].apply(lambda x: x.get('assisted_shot_id', 0)),
+                        passing['pass'].apply(lambda x: x.get('goal_assist', False)),
+                        passing.possession,
                         passing['pass'].apply(lambda x: x.get('outcome', pass_dic)['name'])
                         )), columns=['name','id','period','minute','seconds',
                                      'location','x_pos','y_pos','team',
                                      'receiver_id','receiver_name',
-                                     'height','length','angle','is_cross','outcome'])
+                                     'height','length','angle','is_cross',
+                                     'is_shot_assist','is_goal_assist','possession',
+                                     'outcome'])
     
     
     return passing_df.to_json()
+
+@app.callback(
+            Output('stats_div', 'children'),
+            [Input('passing_div', 'children'),
+            Input('shots_div', 'children')])
+def update_location_data(passing_df, shots_df):
+    passing_df = pd.read_json(passing_df)
+    shots_df = pd.read_json(shots_df)
+    
+    xg_stats = (passing_df
+                 .query('outcome != outcome')
+                 .merge(shots_df[['team','possession','xg','shot_id']],
+                        how='inner',
+                        on=['team','possession'])
+                 [['name','id','team','shot_id','is_shot_assist','is_goal_assist','possession','xg']]
+                 .assign(is_shot_assist = lambda x: np.where(x.is_shot_assist == 0, 0, 1),
+                         is_buildup = lambda x: np.where(x.is_shot_assist == 0, 1, 0),
+                         is_shot = 0)
+                 .append(shots_df[['name','id','team','possession','xg','shot_id']]
+                         .assign(is_shot = 1), ignore_index=True, sort=False)
+                 .groupby(['id','name','team','possession','shot_id'], as_index=False)
+                 ['xg','is_shot_assist','is_goal_assist','is_buildup','is_shot'].max()
+                 .assign(xg_contribution = lambda x: x.xg,
+                         xg_buildup = lambda x: x.xg * x.is_buildup,
+                         xg_assist = lambda x: x.xg * x.is_shot_assist,
+                         xg_shot= lambda x: x.xg * x.is_shot)
+                 .groupby(['id','name','team'])
+                 ['xg_contribution','xg_buildup','xg_assist','xg_shot']
+                 .sum())
+
+    comp_passes = lambda x: np.sum(np.where(x.isnull(), 1, 0))
+    prog_passes = lambda x: np.sum(np.where((x < 78.75) & (x > -78.75), 1, 0))
+
+    pass_stats = (passing_df
+                 .groupby(['id','name','team'])
+                 .agg({
+                     'period': 'count',
+                     'outcome': comp_passes,
+                     'angle': prog_passes,
+                     'length': 'mean'
+                 })
+                 .rename(columns={
+                     'period':'num_passes',
+                     'outcome':'pass_completion_rate',
+                     'angle':'percent_progressive_passes',
+                     'length': 'average_pass_length'
+                 })
+                 .assign(pass_completion_rate = lambda x: x.pass_completion_rate/x.num_passes,
+                         percent_progressive_passes = lambda x: x.percent_progressive_passes/x.num_passes))
+
+    disp_table = pass_stats.join(xg_stats).fillna(0).reset_index()
+
+    return disp_table.to_json()
 
 @app.callback(
             Output('location_div', 'children'),
@@ -1724,18 +1813,28 @@ def update_player_profile(pass_angles, clickData, top_xg, match_info, theme):
     return create_player_profile(pass_angles, selected_name, match_info, theme)
 
 @app.callback(
-            Output('player_profile2', 'figure'),
-            [Input('passing_angles_div', 'children'),
-             Input('pass_map', 'hoverData'),
-             Input('top_xg_div', 'children'),
-             Input('match_info_div', 'children'),
-             Input('theme_div', 'children')])
-def update_player_profile_2(pass_angles, hoverData, top_xg, match_info, theme):
-    match_info = json.loads(match_info)
-    pass_angles = pd.read_json(pass_angles)
+            Output('player_profile2', 'children'),
+            [Input('stats_div', 'children'),
+             Input('pass_map', 'clickData'),
+             Input('top_xg_div', 'children')])
+def update_player_profile_2(disp_table, clickData, top_xg):
+    disp_table = pd.read_json(disp_table)
     top_xg = pd.read_json(top_xg).sort_values('total_xg', ascending=False)
-    selected_name = hoverData['points'][0]['customdata'] if hoverData else top_xg.name.iloc[1]
-    return create_player_profile(pass_angles, selected_name, match_info, theme)
+    selected_name = clickData['points'][0]['customdata'] if clickData else top_xg.name.iloc[1]
+    
+    fstats = disp_table[disp_table.name == selected_name].iloc[0].to_dict()
+
+    tdata = [['NUMBER OF PASSES:',f"{fstats['num_passes']:.0f}", 
+              'XG-CONTRIBUTION:', f"{fstats['xg_contribution']:.2f}"],
+            ['PASS COMPLETION RATE:',f"{fstats['pass_completion_rate']:.1%}", 
+             'XG-BUILDUP:', f"{fstats['xg_buildup']:.2f}"],
+            ['% PROGRESSIVE PASSES:',f"{fstats['percent_progressive_passes']:.1%}", 
+             'XG-ASSISTS:', f"{fstats['xg_assist']:.2f}"],
+            ['AVERAGE PASS LENGTH:',f"{fstats['average_pass_length']:.1f}", 
+             'EXPECTED GOALS:', f"{fstats['xg_shot']:.2f}"]]
+
+    # return top_xg.iloc[:,:4].to_dict('rows')
+    return ([html.Tr([html.Td(val) for val in row]) for row in tdata])
 
 @app.callback(
             Output('pass_map', 'figure'),

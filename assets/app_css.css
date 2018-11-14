@@ -76,6 +76,12 @@ h3 {
 	bottom:63vh;
 }
 
+#player_profile_header{
+	width: 52vw;
+	right: 0vh;
+	top: 0vh;
+}
+
 #infopanel{
 	width: 100vw;
 }
@@ -131,19 +137,40 @@ div.graph {}
 }
 
 #player_profile {
-	height: 25vh;
+	height: 21vh;
 	width: 20vw;
-	right: 30vw;
-	top: 0.5vh;
+	right: 29vw;
+	top: 4vh;
 	position:absolute;
 }
 
 #player_profile2 {
-	height: 25vh;
-	width: 20vw;
-	right: 4vw;
-	top: 0.5vh;
+	/*height: 25vh;*/
+	width: 25vw;
+	right: 3vw;
+	top: 6.5vh;
 	position:absolute;
+}
+
+table {
+	font-family: 'Bebas Neue';
+	border-spacing: 0;
+	border-collapse: collapse;
+}
+
+th {
+	display:none;
+}
+
+tr{
+	height: 4vh;
+}
+
+td{
+	height: 3vh;
+	font-size: 2vh;
+	padding-left: 0.5vw;
+	margin:0;
 }
 
 #shot_plot {
