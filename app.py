@@ -1838,10 +1838,8 @@ def update_player_profile(pass_angles, clickData, top_xg, match_info, theme):
 def update_player_profile_2(disp_table, clickData, top_xg):
     disp_table = pd.read_json(disp_table)
     top_xg = pd.read_json(top_xg).sort_values('total_xg', ascending=False)
-    selected_name = clickData['points'][0]['customdata'] if clickData else top_xg.name.iloc[1]
-    
+    selected_name = clickData['points'][0]['customdata'] if clickData else top_xg.name.iloc[0]
     fstats = disp_table[disp_table.name == selected_name].iloc[0].to_dict()
-
     tdata = [['NUMBER OF PASSES:',f"{fstats['num_passes']:.0f}", 
               'XG-CONTRIBUTION:', f"{fstats['xg_contribution']:.2f}"],
             ['PASS COMPLETION RATE:',f"{fstats['pass_completion_rate']:.1%}", 
