@@ -80,6 +80,10 @@ field_theme = '2'
 
 matches = pd.read_json('./data/matches/43.json', encoding='utf-8').sort_values('match_id')
 
+match_cols = ['home','away', 'home_score','away_score',
+              'match_date','display_date','match_id','referee_name',
+              'stadium_name','stage','description']
+
 matches =  (matches
             .assign(home = matches.home_team.apply(lambda x: x['home_team_name']),
                     away = matches.away_team.apply(lambda x: x['away_team_name']),
@@ -91,12 +95,273 @@ matches =  (matches
                             + (['Third Place Match']) + (['Final'])),
                     description = lambda x: x['stage'] + ' : ' + x['home'] + ' vs ' + x['away'],
                     match_date = pd.to_datetime(matches.match_date),
-                    display_date = lambda x: x.match_date.dt.strftime('%d %B %Y').str.strip('0')))
+                    display_date = lambda x: x.match_date.dt.strftime('%d %B %Y').str.strip('0'))
+            .loc[:, match_cols])
+
+match_info = matches.set_index('match_id').T.to_dict()
 
 team_colors = {
     'home': 'rgba(255,77,77, 1)',
     'away': 'rgba(77,77,255, 1)'
 }
+
+event_dfs = []
+for match in matches.match_id.tolist():
+    df = (pd.read_json('./data/events/{}.json'.format(match), encoding='utf-8')
+          .assign(match_id = match))
+    event_dfs.append(df)
+
+events = (pd.concat(event_dfs, ignore_index=True, sort=False)
+            .query('minute < 120'))
+
+shots = events[events.type.apply(lambda x: x['name']) == 'Shot']
+
+shots_df = pd.DataFrame(
+    list(zip(
+        shots.player.apply(lambda x: x['name']),
+        shots.player.apply(lambda x: x['id']),
+        shots.team.apply(lambda x: x['name']),
+        shots.period,
+        shots.minute,
+        shots.second,
+        shots.location,
+        shots.shot.apply(lambda x: x['statsbomb_xg']),
+        shots.shot.apply(lambda x: x['end_location']),
+        shots.shot.apply(lambda x: x['outcome']['name']),
+        shots.shot.apply(lambda x: x['body_part']['name']),
+        shots.shot.apply(lambda x: x['technique']['name']),
+        shots.possession,
+        shots.id,
+        shots.match_id
+    )), columns=['name','id','team','period','minute','seconds','location','xg',
+                 'end_location','outcome','body_part','technique', 'possession',
+                 'shot_id', 'match_id'])
+
+og = events[events.type.apply(lambda x: x['name']) == 'Own Goal Against']
+
+og_df = pd.DataFrame(
+    list(zip(
+        og.player.apply(lambda x: x['name']),
+        og.player.apply(lambda x: x['id']),
+        og.possession_team.apply(lambda x: x['name']),
+        og.period,
+        og.minute,
+        og.second,
+        og.location.apply(lambda x: [120 - x[0], 80 - x[1]]),
+        [0] * og.shape[0],
+        [[120, 40]] * og.shape[0],
+        ['Goal'] * og.shape[0],
+        ['Unknown'] * og.shape[0],
+        ['Unknown'] * og.shape[0],
+        og.possession,
+        og.match_id
+    )), columns=['name','id','team','period','minute','seconds','location',
+                 'xg','end_location','outcome','body_part','technique',
+                 'possession','match_id'])
+
+shots_df = pd.concat([shots_df, og_df], ignore_index=True, sort=False)
+
+shots_df.loc[:, 'dec_time'] = shots_df.minute + shots_df.seconds/60
+shots_df = shots_df.sort_values(['match_id','period','dec_time'])
+shots_df.loc[:, 'cum_xg'] = shots_df.groupby(['match_id','team'])['xg'].cumsum()
+
+shots_df.loc[:, 'hover_text'] = (shots_df.name 
+                                + ' ('
+                                + shots_df.team
+                                + ')<br>Time: '
+                                + shots_df.minute.astype(str)
+                                + ':'
+                                + shots_df.seconds.astype(str)
+                                +'<br>xG: '
+                                + shots_df.xg.map('{:.3f}'.format)
+                                + '<br>Cum. xG: '
+                                + shots_df.cum_xg.map('{:.3f}'.format)
+                                + '<br>Outcome: '
+                                + shots_df.outcome
+                                + '<br>Body Part: '
+                                + shots_df.body_part)
+
+shots_df.loc[:, 'team_type'] = shots_df.apply(lambda row: 'home' if row['team'] == match_info[row['match_id']]['home'] else 'away', axis=1)
+shots_df.loc[:, 'shot_color'] = np.where(shots_df.outcome == 'Goal', 'black', shots_df.team_type.map(team_colors))
+
+# create passing dataframe
+passing = events[(events.type.apply(lambda x: x['name']) == 'Pass')]
+
+pass_dic = {'id': None,
+           'name': None}
+
+passing_df = pd.DataFrame(
+                list(zip(
+                    passing.player.apply(lambda x: x['name']),
+                    passing.player.apply(lambda x: x['id']),
+                    passing.period,
+                    passing.minute,
+                    passing.second,
+                    passing.location,
+                    passing.location.apply(lambda x: x[0]),
+                    passing.location.apply(lambda x: x[1]),
+                    passing.team.apply(lambda x: x['name']),
+                    passing['pass'].apply(lambda x: x.get('recipient', pass_dic)['id']),
+                    passing['pass'].apply(lambda x: x.get('recipient', pass_dic)['name']),
+                    passing['pass'].apply(lambda x: x['height']['name']),
+                    passing['pass'].apply(lambda x: x['length']),
+                    passing['pass'].apply(lambda x: (x['angle'] * 180) / 3.14),
+                    passing['pass'].apply(lambda x: x.get('cross', 0)),
+                    passing['pass'].apply(lambda x: x.get('assisted_shot_id', 0)),
+                    passing['pass'].apply(lambda x: x.get('goal_assist', False)),
+                    passing.possession,
+                    passing['pass'].apply(lambda x: x.get('outcome', pass_dic)['name']),
+                    passing.match_id
+                    )), columns=['name','id','period','minute','seconds',
+                                 'location','x_pos','y_pos','team',
+                                 'receiver_id','receiver_name',
+                                 'height','length','angle','is_cross',
+                                 'is_shot_assist','is_goal_assist','possession',
+                                 'outcome', 'match_id'])
+
+# create table stats dataframe
+xg_stats = (passing_df
+             .query('outcome != outcome')
+             .merge(shots_df[['match_id','team','possession','xg','shot_id']],
+                    how='inner',
+                    on=['match_id','team','possession'])
+             [['match_id','name','id','team','shot_id','is_shot_assist','is_goal_assist','possession','xg']]
+             .assign(is_shot_assist = lambda x: np.where(x.is_shot_assist == 0, 0, 1),
+                     is_buildup = lambda x: np.where(x.is_shot_assist == 0, 1, 0),
+                     is_shot = 0)
+             .append(shots_df[['match_id','name','id','team','possession','xg','shot_id']]
+                     .assign(is_shot = 1), ignore_index=True, sort=False)
+             .groupby(['match_id','id','name','team','possession','shot_id'], as_index=False)
+             ['xg','is_shot_assist','is_goal_assist','is_buildup','is_shot'].max()
+             .assign(xg_contribution = lambda x: x.xg,
+                     xg_buildup = lambda x: x.xg * x.is_buildup,
+                     xg_assist = lambda x: x.xg * x.is_shot_assist,
+                     xg_shot= lambda x: x.xg * x.is_shot)
+             .groupby(['match_id','id','name','team'])
+             ['xg_contribution','xg_buildup','xg_assist','xg_shot']
+             .sum())
+
+comp_passes = lambda x: np.sum(np.where(x.isnull(), 1, 0))
+prog_passes = lambda x: np.sum(np.where((x < 78.75) & (x > -78.75), 1, 0))
+
+pass_stats = (passing_df
+             .groupby(['match_id','id','name','team'])
+             .agg({
+                 'period': 'count',
+                 'outcome': comp_passes,
+                 'angle': prog_passes,
+                 'length': 'mean'
+             })
+             .rename(columns={
+                 'period':'num_passes',
+                 'outcome':'pass_completion_rate',
+                 'angle':'percent_progressive_passes',
+                 'length': 'average_pass_length'
+             })
+             .assign(pass_completion_rate = lambda x: x.pass_completion_rate/x.num_passes,
+                     percent_progressive_passes = lambda x: x.percent_progressive_passes/x.num_passes))
+
+disp_table = pass_stats.join(xg_stats).fillna(0).reset_index()
+
+# create location dataframe
+
+mask = (~events.play_pattern.apply(lambda x: x['name'])
+        .isin(['From Free Kick', 'From Corner']))
+
+location = events[mask & (pd.notnull(events.player)) & (pd.notnull(events.location))]
+
+location_df = pd.DataFrame(
+                    list(zip(
+                        location.player.apply(lambda x: x['name']),
+                        location.player.apply(lambda x: x['id']),
+                        location.period,
+                        location.minute,
+                        location.second,
+                        location.location,
+                        location.location.apply(lambda x: x[0]),
+                        location.location.apply(lambda x: x[1]),
+                        location.team.apply(lambda x: x['name']),
+                        location.type.apply(lambda x: x['name']),
+                        location.match_id
+                        )), columns=['name','id','period','minute','seconds',
+                                     'location','x_pos','y_pos','team','event','match_id'])
+
+# create lineup data
+
+lineups_df = (events.loc[events.type.apply(lambda x: x['name']) == 'Starting XI', 
+                      ['match_id','team','tactics']]
+              .assign(team = lambda x: x.team.apply(lambda y: y['name']))
+              .merge(pd.melt(matches, id_vars=['match_id'], value_vars=['home','away'], 
+                             var_name='team_type', value_name='team'),
+                     how='left', on=['match_id','team']))
+
+lineups = (lineups_df
+           .assign(starting = lineups_df.tactics.apply(lambda x: [player['player']['id'] for player in x['lineup']]))
+           .pivot(index='match_id', columns='team_type', values='starting'))
+
+# create top xg data
+
+top_xg = (shots_df
+          .assign(is_goal = np.where(shots_df.outcome == 'Goal', 1, 0))
+          .groupby(['match_id','team','name','id'])
+          .agg({'xg': ['sum', 'count', 'max'], 'is_goal':['sum']})
+          .T.reset_index(drop=True).T
+          .rename(columns = {
+                              0: 'total_xg',
+                              1: 'shots',
+                              2: 'max_xg',
+                              3: 'goals'
+                            })
+          .reset_index()
+          .sort_values(['match_id','total_xg'], ascending=[True, False])
+          .groupby('match_id').head(3)
+          .reset_index(drop=True))
+
+top_xg.loc[:, 'hover_text'] = (top_xg.name 
+                                + '<br>Total xG: '
+                                + top_xg.total_xg.map('{:.3f}'.format)
+                                + '<br>Shots: '
+                                + top_xg.shots.map('{:.0f}'.format)
+                                + '<br>Goals: '
+                                + top_xg.goals.map('{:.0f}'.format)
+                                + '<br>Max xG: '
+                                + top_xg.max_xg.map('{:.3f}'.format))
+
+# create passing angles dataframe
+
+pass_color_dic = {
+    1: 'rgb(152, 252, 36)',
+    2: 'rgb(207, 250, 30)',
+    3: 'rgb(248, 208, 22)',
+    4: 'rgb(247, 144, 17)',
+    5: 'rgb(245, 88, 12)',
+}
+
+pass_description = {
+    1: 'Very Short',
+    2: 'Short',
+    3: 'Medium',
+    4: 'Long',
+    5: 'Very Long',
+}
+
+pass_angles = (passing_df
+              .assign(mod_angle = np.where(passing_df.angle < 0, 360 + passing_df.angle, passing_df.angle))
+              .assign(pass_sector = lambda x: pd.cut(x.mod_angle, 
+                                                    bins = np.linspace(11.25, 348.75, 16),
+                                                    labels = list(range(1, 16))))
+              .assign(pass_sector = lambda x: x.pass_sector.astype('float'))
+              .fillna({'pass_sector': 0})  
+              .groupby(['match_id', 'team', 'id', 'name', 'pass_sector'])
+              .agg({'length': ['count', 'mean']})
+              .length
+              .reset_index()
+              .assign(pass_style = lambda x: pd.cut(x['mean'],
+                                                   bins = [0, 10, 20, 40, 60, 130],
+                                                   labels = [1, 2, 3, 4, 5]),
+                      pass_color = lambda x: x['pass_style'].map(pass_color_dic),
+                      hover_text = lambda x: x['pass_style'].map(pass_description)))
+
 
 # XG PLOT
 
@@ -106,22 +371,22 @@ def create_xg_plot(shots_df, events, top_xg, match_info, theme):
     shots_df = shots_df.sort_values(['period','dec_time'])
 
     trace1 = go.Scatter(
-                    x = [0] + list(shots_df[shots_df.team == match_info['teams']['home']].dec_time) + [events.minute.max() + 1],
-                    y = [0] + list(shots_df[shots_df.team == match_info['teams']['home']].cum_xg) + [list(shots_df[shots_df.team == match_info['teams']['home']].cum_xg)[-1]],
+                    x = [0] + list(shots_df[shots_df.team == match_info['home']].dec_time) + [events.minute.max() + 1],
+                    y = [0] + list(shots_df[shots_df.team == match_info['home']].cum_xg) + [list(shots_df[shots_df.team == match_info['home']].cum_xg)[-1]],
                     line = dict(color = team_colors['home'], shape='hv', width=2),
                     mode = 'lines',
-                    name = match_info['teams']['home'].upper(),
-                    text = [''] + list(shots_df[shots_df.team == match_info['teams']['home']].hover_text) + [''],
+                    name = match_info['home'].upper(),
+                    text = [''] + list(shots_df[shots_df.team == match_info['home']].hover_text) + [''],
                     hoverinfo = 'text'
     )
 
     trace2 = go.Scatter(
-                    x = [0] + list(shots_df[shots_df.team == match_info['teams']['away']].dec_time) + [events.minute.max() + 1],
-                    y = [0] + list(shots_df[shots_df.team == match_info['teams']['away']].cum_xg) + [list(shots_df[shots_df.team == match_info['teams']['away']].cum_xg)[-1]],
+                    x = [0] + list(shots_df[shots_df.team == match_info['away']].dec_time) + [events.minute.max() + 1],
+                    y = [0] + list(shots_df[shots_df.team == match_info['away']].cum_xg) + [list(shots_df[shots_df.team == match_info['away']].cum_xg)[-1]],
                     line = dict(color = team_colors['away'], shape='hv', width=2),
                     mode = 'lines',
-                    name = match_info['teams']['away'].upper(),
-                    text = [''] + list(shots_df[shots_df.team == match_info['teams']['away']].hover_text) + [''],
+                    name = match_info['away'].upper(),
+                    text = [''] + list(shots_df[shots_df.team == match_info['away']].hover_text) + [''],
                     hoverinfo = 'text'
     )
 
@@ -131,7 +396,7 @@ def create_xg_plot(shots_df, events, top_xg, match_info, theme):
                 x = top_xg.name,
                 y = top_xg.total_xg,
                 marker=dict(
-                    color = [team_colors['home'] if team == match_info['teams']['home'] else team_colors['away'] for team in top_xg.team],
+                    color = [team_colors['home'] if team == match_info['home'] else team_colors['away'] for team in top_xg.team],
                     line=dict(
                         color=graph_styles[theme]['axis_color'],
                         width=1.5),
@@ -153,32 +418,32 @@ def create_xg_plot(shots_df, events, top_xg, match_info, theme):
 
 
     shot_trace_1 = go.Scatter(
-                        x = shots_df[(shots_df.outcome == 'Goal') & (shots_df.team == match_info['teams']['home'])].dec_time,
-                        y = shots_df[(shots_df.outcome == 'Goal') & (shots_df.team == match_info['teams']['home'])].cum_xg + (shots_df.cum_xg.max() * 0.083),
+                        x = shots_df[(shots_df.outcome == 'Goal') & (shots_df.team == match_info['home'])].dec_time,
+                        y = shots_df[(shots_df.outcome == 'Goal') & (shots_df.team == match_info['home'])].cum_xg + (shots_df.cum_xg.max() * 0.083),
                         mode = 'markers',
                         marker = {
                                 'size': 10,
                                 'color': team_colors['home'],
                                 'opacity': 0.8,
                                  },
-                        text = shots_df[(shots_df.outcome == 'Goal') & (shots_df.team == match_info['teams']['home'])].hover_text,
+                        text = shots_df[(shots_df.outcome == 'Goal') & (shots_df.team == match_info['home'])].hover_text,
                         hoverinfo = 'text',
-                        name = '{}'.format(match_info['teams']['home']),
+                        name = '{}'.format(match_info['home']),
                         showlegend=False,
                         )
 
     shot_trace_2 = go.Scatter(
-                        x = shots_df[(shots_df.outcome == 'Goal') & (shots_df.team == match_info['teams']['away'])].dec_time,
-                        y = shots_df[(shots_df.outcome == 'Goal') & (shots_df.team == match_info['teams']['away'])].cum_xg + (shots_df.cum_xg.max() * 0.083),
+                        x = shots_df[(shots_df.outcome == 'Goal') & (shots_df.team == match_info['away'])].dec_time,
+                        y = shots_df[(shots_df.outcome == 'Goal') & (shots_df.team == match_info['away'])].cum_xg + (shots_df.cum_xg.max() * 0.083),
                         mode = 'markers',
                         marker = {
                                 'size': 10,
                                 'color': team_colors['away'],
                                 'opacity': 0.8,
                                  },
-                        text = shots_df[(shots_df.outcome == 'Goal') & (shots_df.team == match_info['teams']['away'])].hover_text,
+                        text = shots_df[(shots_df.outcome == 'Goal') & (shots_df.team == match_info['away'])].hover_text,
                         hoverinfo = 'text',
-                        name = '{}'.format(match_info['teams']['away']),
+                        name = '{}'.format(match_info['away']),
                         showlegend=False,
                         )
 
@@ -269,10 +534,10 @@ def create_xg_plot(shots_df, events, top_xg, match_info, theme):
                         'size': 20,
                         'color': graph_styles[theme]['titlefont']['color'],
                 },
-                'text': '{} {:.2f} - {:.2f} {}'.format(match_info['teams']['home'],
-                                                       shots_df[shots_df.team == match_info['teams']['home']].cum_xg.max(),
-                                                       shots_df[shots_df.team == match_info['teams']['away']].cum_xg.max(),
-                                                       match_info['teams']['away']),
+                'text': '{} {:.2f} - {:.2f} {}'.format(match_info['home'],
+                                                       shots_df[shots_df.team == match_info['home']].cum_xg.max(),
+                                                       shots_df[shots_df.team == match_info['away']].cum_xg.max(),
+                                                       match_info['away']),
         },
         ]
     )
@@ -286,7 +551,7 @@ def create_xg_plot(shots_df, events, top_xg, match_info, theme):
 
 def create_shot_scatter(shots_df, match_info, team):
     """Create shot scatter for home/away team."""
-    shots_df_team = shots_df[(shots_df.team == match_info['teams'][team]) & 
+    shots_df_team = shots_df[(shots_df.team == match_info[team]) & 
                             (shots_df.location.apply(lambda x: x[0]) > 60)]
     shot_trace = go.Scatter(
                         x = shots_df_team.location.apply(lambda x: x[0]),
@@ -299,7 +564,7 @@ def create_shot_scatter(shots_df, match_info, team):
                                  },
                         text = shots_df_team.hover_text,
                         hoverinfo = 'text',
-                        name = '{}'.format(match_info['teams'][team].upper())
+                        name = '{}'.format(match_info[team].upper())
                         )
     return shot_trace
 
@@ -532,32 +797,32 @@ def create_spider_chart(events, shots_df, passing_df, match_info, theme):
     plot_attributes = list(plot_stats.attribute.values) + [plot_stats.attribute.values[0]]
 
     radar_1 = go.Scatterpolar(
-                        r = list(plot_stats[match_info['teams']['home']].values) + [plot_stats[match_info['teams']['home']].values[0]],
+                        r = list(plot_stats[match_info['home']].values) + [plot_stats[match_info['home']].values[0]],
                         theta = plot_attributes,
                         fill = 'toself',
     #                     fillcolor = 'rgba(255,77,77, 0.5)',
                         line = {
                             'color': team_colors['home']
                         },
-                        name = match_info['teams']['home'],
+                        name = match_info['home'],
     #                     legendgroup = '{}'.format(angles[idx][3]),
     #                     showlegend = True if idx in ['passes','xg','pressure','headers'] else False,
-                        text = (plot_stats.attribute.values + ' : ' + team_stats[match_info['teams']['home']].map('{:.1f}'.format)),
+                        text = (plot_stats.attribute.values + ' : ' + team_stats[match_info['home']].map('{:.1f}'.format)),
                         hoverinfo = 'text'
     )
 
     radar_2 = go.Scatterpolar(
-                        r = list(plot_stats[match_info['teams']['away']].values) + [plot_stats[match_info['teams']['away']].values[0]],
+                        r = list(plot_stats[match_info['away']].values) + [plot_stats[match_info['away']].values[0]],
                         theta = plot_attributes,
                         fill = 'toself',
     #                     fillcolor = 'rgba(77,77,255, 0.5)',
                         line = {
                             'color': team_colors['away']
                         },
-                        name = match_info['teams']['away'],
+                        name = match_info['away'],
     #                     legendgroup = '{}'.format(angles[idx][3]),
     #                     showlegend = True if idx in ['passes','xg','pressure','headers'] else False,
-                        text = (plot_stats.attribute.values + ' : ' + team_stats[match_info['teams']['away']].map('{:.1f}'.format)),
+                        text = (plot_stats.attribute.values + ' : ' + team_stats[match_info['away']].map('{:.1f}'.format)),
                         hoverinfo = 'text'
     )
 
@@ -753,7 +1018,7 @@ def create_performance_radars():
     traces_away = []
     for idx, row in plot_stats.iterrows():
         trace_home = go.Scatterpolar(
-                            r = [0, row[match_info['teams']['home']], row[match_info['teams']['home']], 0],
+                            r = [0, row[match_info['home']], row[match_info['home']], 0],
                             theta = angles[idx][0],
                             mode = 'lines',
                             fill = 'toself',
@@ -761,12 +1026,12 @@ def create_performance_radars():
                             line = {
                                 'color': 'white'
                             },
-                            text = '{}: {:.1f}'.format(angles[idx][2], row[match_info['teams']['home']]),
+                            text = '{}: {:.1f}'.format(angles[idx][2], row[match_info['home']]),
                             hoverinfo = 'text')
         traces_home.append(trace_home)
 
         trace_away = go.Scatterpolar(
-                            r = [0, row[match_info['teams']['away']], row[match_info['teams']['away']], 0],
+                            r = [0, row[match_info['away']], row[match_info['away']], 0],
                             theta = angles[idx][0],
                             mode = 'lines',
                             fill = 'toself',
@@ -774,7 +1039,7 @@ def create_performance_radars():
                             line = {
                                 'color': 'white'
                             },
-                            text = '{}: {:.1f}'.format(angles[idx][2], row[match_info['teams']['away']]),
+                            text = '{}: {:.1f}'.format(angles[idx][2], row[match_info['away']]),
                             hoverinfo = 'text')
 
         traces_away.append(trace_away)
@@ -948,6 +1213,8 @@ def create_full_field(theme):
     full_field = full_field_shapes + duplicate_shapes
     return full_field
 
+full_field = {'dark': create_full_field('dark'), 'light': create_full_field('light')}
+
 def create_map_traces(team, positions, pass_combinations, starting, match_info):
     """Create passing network map traces for team."""
     position_team = positions[positions.id.isin(starting[team])]
@@ -955,7 +1222,7 @@ def create_map_traces(team, positions, pass_combinations, starting, match_info):
     formation_team = go.Scatter(
                                 x = position_team.y_pos,
                                 y = position_team.x_pos,
-                                name = match_info['teams'][team],
+                                name = match_info[team],
                                 mode = 'markers+text',
                                 marker = {
                                         'size': 40 * position_team.pass_frac,
@@ -1040,10 +1307,8 @@ def create_passing_network_map(passing_df, location_df, starting, match_info, th
 
     data = home_traces + away_traces
 
-    full_field = create_full_field(theme)
-
     layout = {
-        'shapes': full_field,
+        'shapes': full_field[theme],
         'hovermode': 'closest',
         'xaxis': {'range': [-5, 85], 'visible': False, 'domain':[0, 0.5]},
         'yaxis': {'range': [-5, 125], 'visible': False},
@@ -1096,22 +1361,6 @@ def create_passing_network_map(passing_df, location_df, starting, match_info, th
 
 # Player Profile
 
-pass_color_dic = {
-    1: 'rgb(152, 252, 36)',
-    2: 'rgb(207, 250, 30)',
-    3: 'rgb(248, 208, 22)',
-    4: 'rgb(247, 144, 17)',
-    5: 'rgb(245, 88, 12)',
-}
-
-pass_description = {
-    1: 'Very Short',
-    2: 'Short',
-    3: 'Medium',
-    4: 'Long',
-    5: 'Very Long',
-}
-
 angle_dic = {i: [i*22.5, i*22.5, (i*22.5) + 22.5, (i*22.5) + 22.5] for i in range(16)}
 
 def create_player_profile(pass_angles, player_name, match_info, theme):
@@ -1139,7 +1388,7 @@ def create_player_profile(pass_angles, player_name, match_info, theme):
                       polar = {
                           'bgcolor': graph_styles[theme]['bg_color'],
                           'angularaxis': {
-                              'rotation': (90 + 11.25) if player_passes.team.max() == match_info['teams']['home'] else (270 + 11.25),
+                              'rotation': (90 + 11.25) if player_passes.team.max() == match_info['home'] else (270 + 11.25),
                               'direction': 'clockwise',
                               'showline': False,
                               'showticklabels': False,
@@ -1269,7 +1518,7 @@ app.layout = html.Div(id='bodydiv', children = [
                             ])
                                 ),
                     html.Div(id='container', children=[
-                                        dcc.Graph(className='graph', id='xg_plot', relayoutData={}, config={'modeBarButtons': [['zoom2d','resetViews']], 'displaylogo':False}),
+                                        dcc.Graph(className='graph', id='xg_plot', relayoutData={}, config={'modeBarButtons': [['zoom2d','select2d','resetViews']],'displaylogo':False}),
                                         dcc.Graph(className='graph', id='player_profile', config={'displayModeBar': False}),
                                         # table.DataTable(id='player_profile2', columns=[{'name': 'name', 'id': 'name'}, {'name': 'team', 'id': 'team'}, 
                                         #                                                 {'name': 'total_xg', 'id': 'total_xg'}, {'name': 'shots', 'id': 'shots'}],
@@ -1315,15 +1564,6 @@ app.layout = html.Div(id='bodydiv', children = [
                                 html.Li("All analysis was carried out using Python data stack. Visualization realized with the help of Plotly's Dash framework."),
                                         ])
                                 ])),
-                    html.Div(id='events_div', style={'display': 'none'}),
-                    html.Div(id='match_info_div', style={'display': 'none'}),
-                    html.Div(id='shots_div', style={'display': 'none'}),
-                    html.Div(id='passing_div', style={'display': 'none'}),
-                    html.Div(id='stats_div', style={'display': 'none'}),
-                    html.Div(id='location_div', style={'display': 'none'}),
-                    html.Div(id='starting_div', style={'display': 'none'}),
-                    html.Div(id='top_xg_div', style={'display': 'none'}),
-                    html.Div(id='passing_angles_div', style={'display': 'none'}),
                     html.Div(id='theme_div', style={'display': 'none'})])
 
 @app.callback(
@@ -1439,364 +1679,44 @@ def update_heading_colors(theme):
 def update_table_colors(theme):
     return {'color':graph_styles[theme]['profile_color']}
 
-
-@app.callback(
-            Output('match_info_div', 'children'),
-            [Input('match_dropdown', 'value')])
-def update_match_info(match_id):
-    
-    match_cols = ['home','away', 'home_score','away_score',
-              'match_date','display_date','match_id','referee_name',
-              'stadium_name','stage','description']
-
-    match_info = matches[matches.match_id == match_id].iloc[0][match_cols].to_dict()
-
-    match_info['teams'] = {'home': match_info['home'], 'away': match_info['away']}
-    match_info['invert_teams'] = {match_info['home']: 'home', match_info['away']: 'away'}
-    
-    
-    return pd.Series(match_info).to_json()
-
 @app.callback(
             Output('match_header', 'children'),
-            [Input('match_info_div', 'children')])
-def update_match_header(match_info):
-    match_info = json.loads(match_info)
-    new_header = '{} {}-{} {}'.format(match_info['home'].upper(),
-                                     match_info['home_score'],
-                                     match_info['away_score'],
-                                     match_info['away'].upper())
+            [Input('match_dropdown', 'value')])
+def update_match_header(match_id):
+    new_header = '{} {}-{} {}'.format(match_info[match_id]['home'].upper(),
+                                     match_info[match_id]['home_score'],
+                                     match_info[match_id]['away_score'],
+                                     match_info[match_id]['away'].upper())
     return new_header
 
 @app.callback(
             Output('match_date', 'children'),
-            [Input('match_info_div', 'children')])
-def update_match_date(match_info):
-    match_info = json.loads(match_info)
-    return 'Date: {}'.format(match_info['display_date'])
+            [Input('match_dropdown', 'value')])
+def update_match_date(match_id):
+    return 'Date: {}'.format(match_info[match_id]['display_date'])
 
 @app.callback(
             Output('match_stadium', 'children'),
-            [Input('match_info_div', 'children')])
-def update_match_date(match_info):
-    match_info = json.loads(match_info)
-    return 'Stadium: {}'.format(match_info['stadium_name'])
+            [Input('match_dropdown', 'value')])
+def update_match_date(match_id):
+    return 'Stadium: {}'.format(match_info[match_id]['stadium_name'])
 
 @app.callback(
             Output('match_ref', 'children'),
-            [Input('match_info_div', 'children')])
-def update_match_date(match_info):
-    match_info = json.loads(match_info)
-    return 'Referee: {}'.format(match_info['referee_name'])
-
-@app.callback(
-            Output('events_div', 'children'),
             [Input('match_dropdown', 'value')])
-def update_events_data(match_id):
-    
-    events = (pd.read_json('./data/events/{}.json'.format(match_id), encoding='utf-8')
-            .query('minute < 120'))
-    
-    
-    return events.to_json()
-
-@app.callback(
-            Output('shots_div', 'children'),
-            [Input('events_div', 'children'),
-             Input('match_info_div', 'children')])
-def update_shots_data(events, match_info):
-    
-    match_info = json.loads(match_info)
-    events = pd.read_json(events)
-    shots = events[events.type.apply(lambda x: x['name']) == 'Shot']
-
-    shots_df = pd.DataFrame(
-        list(zip(
-            shots.player.apply(lambda x: x['name']),
-            shots.player.apply(lambda x: x['id']),
-            shots.team.apply(lambda x: x['name']),
-            shots.period,
-            shots.minute,
-            shots.second,
-            shots.location,
-            shots.shot.apply(lambda x: x['statsbomb_xg']),
-            shots.shot.apply(lambda x: x['end_location']),
-            shots.shot.apply(lambda x: x['outcome']['name']),
-            shots.shot.apply(lambda x: x['body_part']['name']),
-            shots.shot.apply(lambda x: x['technique']['name']),
-            shots.possession,
-            shots.id
-        )), columns=['name','id','team','period','minute','seconds','location','xg',
-                     'end_location','outcome','body_part','technique', 'possession', 'shot_id'])
-    
-    og = events[events.type.apply(lambda x: x['name']) == 'Own Goal Against']
-
-    og_df = pd.DataFrame(
-        list(zip(
-            og.player.apply(lambda x: x['name']),
-            og.player.apply(lambda x: x['id']),
-            og.team.apply(lambda x: list(set(match_info['teams'].values()) - {x['name']})[0]),
-            og.period,
-            og.minute,
-            og.second,
-            og.location.apply(lambda x: [120 - x[0], 80 - x[1]]),
-            [0] * og.shape[0],
-            [[120, 40]] * og.shape[0],
-            ['Goal'] * og.shape[0],
-            ['Unknown'] * og.shape[0],
-            ['Unknown'] * og.shape[0],
-            og.possession
-        )), columns=['name','id','team','period','minute','seconds','location','xg',
-                     'end_location','outcome','body_part','technique','possession'])
-
-    shots_df = pd.concat([shots_df, og_df], ignore_index=True, sort=False)
-
-    shots_df.loc[:, 'dec_time'] = shots_df.minute + shots_df.seconds/60
-    shots_df = shots_df.sort_values(['period','dec_time'])
-    shots_df.loc[:, 'cum_xg'] = shots_df.groupby('team')['xg'].cumsum()
-
-    shots_df.loc[:, 'hover_text'] = (shots_df.name 
-                                    + ' ('
-                                    + shots_df.team
-                                    + ')<br>Time: '
-                                    + shots_df.minute.astype(str)
-                                    + ':'
-                                    + shots_df.seconds.astype(str)
-                                    +'<br>xG: '
-                                    + shots_df.xg.map('{:.3f}'.format)
-                                    + '<br>Cum. xG: '
-                                    + shots_df.cum_xg.map('{:.3f}'.format)
-                                    + '<br>Outcome: '
-                                    + shots_df.outcome
-                                    + '<br>Body Part: '
-                                    + shots_df.body_part)
-
-    shots_df.loc[:, 'shot_color'] = np.where(shots_df.outcome == 'Goal', 'black', shots_df.team.map(match_info['invert_teams']).map(team_colors))
-    
-    
-    return shots_df.to_json()
-
-@app.callback(
-            Output('passing_div', 'children'),
-            [Input('events_div', 'children')])
-def update_passing_data(events):
-    
-    events = pd.read_json(events)
-    passing = events[(events.type.apply(lambda x: x['name']) == 'Pass')]
-
-    pass_dic = {'id': None,
-               'name': None}
-
-    passing_df = pd.DataFrame(
-                    list(zip(
-                        passing.player.apply(lambda x: x['name']),
-                        passing.player.apply(lambda x: x['id']),
-                        passing.period,
-                        passing.minute,
-                        passing.second,
-                        passing.location,
-                        passing.location.apply(lambda x: x[0]),
-                        passing.location.apply(lambda x: x[1]),
-                        passing.team.apply(lambda x: x['name']),
-                        passing['pass'].apply(lambda x: x.get('recipient', pass_dic)['id']),
-                        passing['pass'].apply(lambda x: x.get('recipient', pass_dic)['name']),
-                        passing['pass'].apply(lambda x: x['height']['name']),
-                        passing['pass'].apply(lambda x: x['length']),
-                        passing['pass'].apply(lambda x: (x['angle'] * 180) / 3.14),
-                        passing['pass'].apply(lambda x: x.get('cross', 0)),
-                        passing['pass'].apply(lambda x: x.get('assisted_shot_id', 0)),
-                        passing['pass'].apply(lambda x: x.get('goal_assist', False)),
-                        passing.possession,
-                        passing['pass'].apply(lambda x: x.get('outcome', pass_dic)['name'])
-                        )), columns=['name','id','period','minute','seconds',
-                                     'location','x_pos','y_pos','team',
-                                     'receiver_id','receiver_name',
-                                     'height','length','angle','is_cross',
-                                     'is_shot_assist','is_goal_assist','possession',
-                                     'outcome'])
-    
-    
-    return passing_df.to_json()
-
-@app.callback(
-            Output('stats_div', 'children'),
-            [Input('passing_div', 'children'),
-            Input('shots_div', 'children')])
-def update_location_data(passing_df, shots_df):
-    passing_df = pd.read_json(passing_df)
-    shots_df = pd.read_json(shots_df)
-    
-    xg_stats = (passing_df
-                 .query('outcome != outcome')
-                 .merge(shots_df[['team','possession','xg','shot_id']],
-                        how='inner',
-                        on=['team','possession'])
-                 [['name','id','team','shot_id','is_shot_assist','is_goal_assist','possession','xg']]
-                 .assign(is_shot_assist = lambda x: np.where(x.is_shot_assist == 0, 0, 1),
-                         is_buildup = lambda x: np.where(x.is_shot_assist == 0, 1, 0),
-                         is_shot = 0)
-                 .append(shots_df[['name','id','team','possession','xg','shot_id']]
-                         .assign(is_shot = 1), ignore_index=True, sort=False)
-                 .groupby(['id','name','team','possession','shot_id'], as_index=False)
-                 ['xg','is_shot_assist','is_goal_assist','is_buildup','is_shot'].max()
-                 .assign(xg_contribution = lambda x: x.xg,
-                         xg_buildup = lambda x: x.xg * x.is_buildup,
-                         xg_assist = lambda x: x.xg * x.is_shot_assist,
-                         xg_shot= lambda x: x.xg * x.is_shot)
-                 .groupby(['id','name','team'])
-                 ['xg_contribution','xg_buildup','xg_assist','xg_shot']
-                 .sum())
-
-    comp_passes = lambda x: np.sum(np.where(x.isnull(), 1, 0))
-    prog_passes = lambda x: np.sum(np.where((x < 78.75) & (x > -78.75), 1, 0))
-
-    pass_stats = (passing_df
-                 .groupby(['id','name','team'])
-                 .agg({
-                     'period': 'count',
-                     'outcome': comp_passes,
-                     'angle': prog_passes,
-                     'length': 'mean'
-                 })
-                 .rename(columns={
-                     'period':'num_passes',
-                     'outcome':'pass_completion_rate',
-                     'angle':'percent_progressive_passes',
-                     'length': 'average_pass_length'
-                 })
-                 .assign(pass_completion_rate = lambda x: x.pass_completion_rate/x.num_passes,
-                         percent_progressive_passes = lambda x: x.percent_progressive_passes/x.num_passes))
-
-    disp_table = pass_stats.join(xg_stats).fillna(0).reset_index()
-
-    return disp_table.to_json()
-
-@app.callback(
-            Output('location_div', 'children'),
-            [Input('events_div', 'children')])
-def update_location_data(events):
-    
-    events = pd.read_json(events)
-    mask = (~events.play_pattern.apply(lambda x: x['name'])
-            .isin(['From Free Kick', 'From Corner']))
-
-    location = events[mask & (pd.notnull(events.player)) & (pd.notnull(events.location))]
-
-    location_df = pd.DataFrame(
-                        list(zip(
-                            location.player.apply(lambda x: x['name']),
-                            location.player.apply(lambda x: x['id']),
-                            location.period,
-                            location.minute,
-                            location.second,
-                            location.location,
-                            location.location.apply(lambda x: x[0]),
-                            location.location.apply(lambda x: x[1]),
-                            location.team.apply(lambda x: x['name']),
-                            location.type.apply(lambda x: x['name'])
-                            )), columns=['name','id','period','minute','seconds',
-                                         'location','x_pos','y_pos','team','event'])
-    
-    
-    return location_df.to_json()
-
-@app.callback(
-            Output('starting_div', 'children'),
-            [Input('events_div', 'children'),
-             Input('match_info_div', 'children')])
-def update_starting_data(events, match_info):
-    
-    match_info = json.loads(match_info)
-    events = pd.read_json(events)
-    lineups = (events[events.type.apply(lambda x: x['name']) == 'Starting XI']
-               .assign(team_type = lambda x: (x.team
-                                              .apply(lambda y: y['name'])
-                                              .map(match_info['invert_teams']))))
-
-    starting = {
-            'home': [player['player']['id'] for player in lineups[lineups.team_type == 'home'].tactics.iloc[0]['lineup']],
-            'away': [player['player']['id'] for player in lineups[lineups.team_type == 'away'].tactics.iloc[0]['lineup']]
-    }
-    
-    
-    return json.dumps(starting)
-
-@app.callback(
-            Output('top_xg_div', 'children'),
-            [Input('shots_div', 'children')])
-def update_xg_data(shots_df):
-    
-    shots_df = pd.read_json(shots_df)
-
-    top_xg = (shots_df
-              .assign(is_goal = np.where(shots_df.outcome == 'Goal', 1, 0))
-              .groupby(['name', 'team'])
-              .agg({'xg': ['sum', 'count', 'max'], 'is_goal':['sum']})
-              .T.reset_index(drop=True).T
-              .rename(columns = {
-                                  0: 'total_xg',
-                                  1: 'shots',
-                                  2: 'max_xg',
-                                  3: 'goals'
-                                })
-              .reset_index()
-              .sort_values('total_xg', ascending=False)
-              .head(3))
-
-    top_xg.loc[:, 'hover_text'] = (top_xg.name 
-                                    + '<br>Total xG: '
-                                    + top_xg.total_xg.map('{:.3f}'.format)
-                                    + '<br>Shots: '
-                                    + top_xg.shots.map('{:.0f}'.format)
-                                    + '<br>Goals: '
-                                    + top_xg.goals.map('{:.0f}'.format)
-                                    + '<br>Max xG: '
-                                    + top_xg.max_xg.map('{:.3f}'.format))
-
-    
-    
-
-    return top_xg.to_json()
-
-@app.callback(
-            Output('passing_angles_div', 'children'),
-            [Input('passing_div', 'children')])
-def update_player_profile_data(passing_df):
-    passing_df = pd.read_json(passing_df)
-    pass_angles = (passing_df
-                  .assign(mod_angle = np.where(passing_df.angle < 0, 360 + passing_df.angle, passing_df.angle))
-                  .assign(pass_sector = lambda x: pd.cut(x.mod_angle, 
-                                                        bins = np.linspace(11.25, 348.75, 16),
-                                                        labels = list(range(1, 16))))
-                  .assign(pass_sector = lambda x: x.pass_sector.astype('float'))
-                  .fillna({'pass_sector': 0})  
-                  .groupby(['name','team', 'pass_sector'])
-                  .agg({'length': ['count', 'mean']})
-                  .length
-                  .reset_index()
-                  .assign(pass_style = lambda x: pd.cut(x['mean'],
-                                                       bins = [0, 10, 20, 40, 60, 130],
-                                                       labels = [1, 2, 3, 4, 5]),
-                          pass_color = lambda x: x['pass_style'].map(pass_color_dic),
-                          hover_text = lambda x: x['pass_style'].map(pass_description)))
-    return pass_angles.to_json()
+def update_match_date(match_id):
+    return 'Referee: {}'.format(match_info[match_id]['referee_name'])
 
 @app.callback(
             Output('xg_plot', 'figure'),
-            [Input('shots_div', 'children'),
-             Input('events_div', 'children'),
-             Input('top_xg_div', 'children'),
-             Input('match_info_div', 'children'),
+            [Input('match_dropdown', 'value'),
              Input('theme_div', 'children')])
-def update_xg_plot(shots_df, events, top_xg, match_info, theme):
-    
-    match_info = json.loads(match_info)
-    shots_df = pd.read_json(shots_df)
-    events = pd.read_json(events)
-    top_xg = pd.read_json(top_xg)
-    
-    
-    return create_xg_plot(shots_df, events, top_xg, match_info, theme)
+def update_xg_plot(match_id, theme):
+    filtered_shots_df = shots_df[shots_df.match_id == match_id]
+    filtered_events = events[events.match_id == match_id]
+    filtered_top_xg = top_xg[top_xg.match_id == match_id]
+    return create_xg_plot(filtered_shots_df, filtered_events, 
+                    filtered_top_xg, match_info[match_id], theme)
 
 @app.callback(
             Output('pass_map', 'clickData'),
@@ -1818,28 +1738,23 @@ def update_relayoutdata(value):
 
 @app.callback(
             Output('player_profile', 'figure'),
-            [Input('passing_angles_div', 'children'),
-             Input('pass_map', 'clickData'),
-             Input('top_xg_div', 'children'),
-             Input('match_info_div', 'children'),
+            [Input('pass_map', 'clickData'),
+             Input('match_dropdown', 'value'),
              Input('theme_div', 'children')])
-def update_player_profile(pass_angles, clickData, top_xg, match_info, theme):
-    match_info = json.loads(match_info)
-    pass_angles = pd.read_json(pass_angles)
-    top_xg = pd.read_json(top_xg).sort_values('total_xg', ascending=False)
-    selected_name = clickData['points'][0]['customdata'] if clickData else top_xg.name.iloc[0]
-    return create_player_profile(pass_angles, selected_name, match_info, theme)
+def update_player_profile(clickData, match_id, theme):
+    filtered_pass_angles = pass_angles[pass_angles.match_id == match_id]
+    filtered_top_xg = top_xg[top_xg.match_id == match_id]
+    selected_name = clickData['points'][0]['customdata'] if clickData else filtered_top_xg.name.iloc[0]
+    return create_player_profile(filtered_pass_angles, selected_name, match_info[match_id], theme)
 
 @app.callback(
             Output('player_profile2', 'children'),
-            [Input('stats_div', 'children'),
-             Input('pass_map', 'clickData'),
-             Input('top_xg_div', 'children')])
-def update_player_profile_2(disp_table, clickData, top_xg):
-    disp_table = pd.read_json(disp_table)
-    top_xg = pd.read_json(top_xg).sort_values('total_xg', ascending=False)
-    selected_name = clickData['points'][0]['customdata'] if clickData else top_xg.name.iloc[0]
-    fstats = disp_table[disp_table.name == selected_name].iloc[0].to_dict()
+            [Input('pass_map', 'clickData'),
+             Input('match_dropdown', 'value'),])
+def update_player_profile_2(clickData, match_id):
+    filtered_top_xg = top_xg[top_xg.match_id == match_id]
+    selected_name = clickData['points'][0]['customdata'] if clickData else filtered_top_xg.name.iloc[0]
+    fstats = disp_table[(disp_table.match_id == match_id) & (disp_table.name == selected_name)].iloc[0].to_dict()
     tdata = [['NUMBER OF PASSES:',f"{fstats['num_passes']:.0f}", 
               'XG-CONTRIBUTION:', f"{fstats['xg_contribution']:.2f}"],
             ['PASS COMPLETION RATE:',f"{fstats['pass_completion_rate']:.1%}", 
@@ -1854,86 +1769,76 @@ def update_player_profile_2(disp_table, clickData, top_xg):
 
 @app.callback(
             Output('pass_map', 'figure'),
-            [Input('passing_div', 'children'),
-             Input('location_div', 'children'),
-             Input('starting_div', 'children'),
-             Input('match_info_div', 'children'),
+            [Input('match_dropdown', 'value'),
              Input('theme_div', 'children')])
-def update_pass_map(passing_df, location_df, starting, match_info, theme):
+def update_pass_map(match_id, theme):
+    filtered_passing_df = passing_df[passing_df.match_id == match_id]
+    filtered_location_df = location_df[location_df.match_id == match_id]
     
-    starting = json.loads(starting)
-    match_info = json.loads(match_info)
-    passing_df = pd.read_json(passing_df)
-    location_df = pd.read_json(location_df)
-    
-    
-    return create_passing_network_map(passing_df, location_df, starting, match_info, theme)
+    return create_passing_network_map(filtered_passing_df, filtered_location_df, 
+                                        lineups.loc[match_id].to_dict(), 
+                                        match_info[match_id], theme)
 
 @app.callback(
             Output('shot_plot', 'figure'),
             [Input('xg_plot', 'relayoutData'),
-             Input('shots_div', 'children'),
-             Input('match_info_div', 'children'),
+             Input('xg_plot', 'selectedData'),
+             Input('match_dropdown', 'value'),
              Input('theme_div', 'children')])
-def update_shot_plot(relayoutData, shots_df, match_info, theme):
-    
-    match_info = json.loads(match_info)
-    shots_df = pd.read_json(shots_df)
+def update_shot_plot(relayoutData, selectedData, match_id, theme):
     if "xaxis.range[0]" in list(relayoutData.keys()):
-        new_shots_df = shots_df[(shots_df.dec_time > relayoutData['xaxis.range[0]']) 
+        filtered_shots_df = shots_df[(shots_df.match_id == match_id)
+                                & (shots_df.dec_time > relayoutData['xaxis.range[0]']) 
                                 & (shots_df.dec_time < relayoutData['xaxis.range[1]'])]
+    elif "dragmode" in list(relayoutData.keys()) and selectedData:
+        filtered_shots_df = shots_df[(shots_df.match_id == match_id)
+                                & (shots_df.dec_time > selectedData['range']['x'][0]) 
+                                & (shots_df.dec_time < selectedData['range']['x'][1])] 
     else:
-        new_shots_df = shots_df
-    
-    
-    return create_shot_plot(new_shots_df, match_info, theme)
+        filtered_shots_df = shots_df[(shots_df.match_id == match_id)]
+    return create_shot_plot(filtered_shots_df, match_info[match_id], theme)
+
+@app.callback(
+            Output('spider', 'figure'),
+            [Input('xg_plot', 'selectedData'),
+             Input('match_dropdown', 'value'),
+             Input('theme_div', 'children')])
+def update_spider(selectedData, match_id, theme):
+    if selectedData:
+        filtered_shots_df = shots_df[(shots_df.match_id == match_id)
+                                & (shots_df.dec_time > selectedData['range']['x'][0]) 
+                                & (shots_df.dec_time < selectedData['range']['x'][1])]
+        filtered_events = events[(events.match_id == match_id)
+                                & (events.minute >= selectedData['range']['x'][0]) 
+                                & (events.minute <= selectedData['range']['x'][1])]
+        filtered_passing_df = passing_df[(passing_df.match_id == match_id)
+                                & (passing_df.minute >= selectedData['range']['x'][0]) 
+                                & (passing_df.minute <= selectedData['range']['x'][1])]
+    else:
+        filtered_shots_df = shots_df[(shots_df.match_id == match_id)]
+        filtered_events = events[(events.match_id == match_id)]
+        filtered_passing_df = passing_df[(passing_df.match_id == match_id)]
+
+    return create_spider_chart(filtered_events, filtered_shots_df, filtered_passing_df, 
+                                match_info[match_id], theme)
 
 # @app.callback(
 #             Output('spider', 'figure'),
-#             [Input('xg_plot', 'relayoutData'),
-#              Input('events_div', 'children'),
+#             [Input('events_div', 'children'),
 #              Input('shots_div', 'children'),
 #              Input('passing_div', 'children'),
-#              Input('match_info_div', 'children'),
+#              Input('match_dropdown', 'value'),
 #              Input('theme_div', 'children')])
-# def update_spider(relayoutData, events, shots_df, passing_df, match_info, theme):
-#     
+# def update_spider(events, shots_df, passing_df, match_info, theme):
+#
 #     match_info = json.loads(match_info)
 #     events = pd.read_json(events)
 #     shots_df = pd.read_json(shots_df)
 #     passing_df = pd.read_json(passing_df)
-#     if "xaxis.range[0]" in list(relayoutData.keys()):
-#         new_shots_df = shots_df[(shots_df.dec_time > relayoutData['xaxis.range[0]']) 
-#                                 & (shots_df.dec_time < relayoutData['xaxis.range[1]'])]
-#         new_events = events[(events.minute >= relayoutData['xaxis.range[0]']) 
-#                                 & (events.minute <= relayoutData['xaxis.range[1]'])]
-#         new_passing_df = passing_df[(passing_df.minute > relayoutData['xaxis.range[0]']) 
-#                                 & (passing_df.minute < relayoutData['xaxis.range[1]'])]
-#     else:
-#         new_shots_df = shots_df
-#         new_events = events
-#         new_passing_df = passing_df
-#     end=time.time()
-#     
-#     return create_spider_chart(new_events, new_shots_df, new_passing_df, match_info, theme)
-
-@app.callback(
-            Output('spider', 'figure'),
-            [Input('events_div', 'children'),
-             Input('shots_div', 'children'),
-             Input('passing_div', 'children'),
-             Input('match_info_div', 'children'),
-             Input('theme_div', 'children')])
-def update_spider(events, shots_df, passing_df, match_info, theme):
-    
-    match_info = json.loads(match_info)
-    events = pd.read_json(events)
-    shots_df = pd.read_json(shots_df)
-    passing_df = pd.read_json(passing_df)
-    return create_spider_chart(events, shots_df, passing_df, match_info, theme)
+#     return create_spider_chart(events, shots_df, passing_df, match_info, theme)
 
 if __name__ == '__main__':
     app.run_server(
             debug=True, 
-            port = 8080
+            port = 3000
         )
