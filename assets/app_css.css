@@ -32,13 +32,16 @@ h1 {
 	font-size: 8vh;
 	text-align: center;
 	margin: 0%;
+	font-weight: normal;
 }
 
 h2 {
 	font-family: 'Bebas Neue', Roboto Condensed, Roboto, Helvetica Narrow, Arial Narrow, Helvetica, Arial;
 	font-size: 4vh;
 	text-align: center;
-	margin: 0%;}
+	margin: 0%;
+	font-weight: normal;
+	}
 
 h3 {
 	font-family: 'Bebas Neue', Roboto Condensed, Roboto, Helvetica Narrow, Arial Narrow, Helvetica, Arial;
