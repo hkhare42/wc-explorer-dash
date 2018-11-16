@@ -1518,7 +1518,7 @@ app.layout = html.Div(id='bodydiv', children = [
                             ])
                                 ),
                     html.Div(id='container', children=[
-                                        dcc.Graph(className='graph', id='xg_plot', relayoutData={}, config={'modeBarButtons': [['zoom2d','select2d','resetViews']],'displaylogo':False}),
+                                        dcc.Graph(className='graph', id='xg_plot', relayoutData={}, config={'modeBarButtons': [['zoom2d','resetViews']],'displaylogo':False}),
                                         dcc.Graph(className='graph', id='player_profile', config={'displayModeBar': False}),
                                         # table.DataTable(id='player_profile2', columns=[{'name': 'name', 'id': 'name'}, {'name': 'team', 'id': 'team'}, 
                                         #                                                 {'name': 'total_xg', 'id': 'total_xg'}, {'name': 'shots', 'id': 'shots'}],
@@ -1782,38 +1782,52 @@ def update_pass_map(match_id, theme):
 @app.callback(
             Output('shot_plot', 'figure'),
             [Input('xg_plot', 'relayoutData'),
-             Input('xg_plot', 'selectedData'),
              Input('match_dropdown', 'value'),
              Input('theme_div', 'children')])
-def update_shot_plot(relayoutData, selectedData, match_id, theme):
+def update_shot_plot(relayoutData, match_id, theme):
     if "xaxis.range[0]" in list(relayoutData.keys()):
         filtered_shots_df = shots_df[(shots_df.match_id == match_id)
                                 & (shots_df.dec_time > relayoutData['xaxis.range[0]']) 
                                 & (shots_df.dec_time < relayoutData['xaxis.range[1]'])]
-    elif "dragmode" in list(relayoutData.keys()) and selectedData:
-        filtered_shots_df = shots_df[(shots_df.match_id == match_id)
-                                & (shots_df.dec_time > selectedData['range']['x'][0]) 
-                                & (shots_df.dec_time < selectedData['range']['x'][1])] 
     else:
         filtered_shots_df = shots_df[(shots_df.match_id == match_id)]
     return create_shot_plot(filtered_shots_df, match_info[match_id], theme)
 
+# @app.callback(
+#             Output('shot_plot', 'figure'),
+#             [Input('xg_plot', 'relayoutData'),
+#              Input('xg_plot', 'selectedData'),
+#              Input('match_dropdown', 'value'),
+#              Input('theme_div', 'children')])
+# def update_shot_plot(relayoutData, selectedData, match_id, theme):
+#     if "xaxis.range[0]" in list(relayoutData.keys()):
+#         filtered_shots_df = shots_df[(shots_df.match_id == match_id)
+#                                 & (shots_df.dec_time > relayoutData['xaxis.range[0]']) 
+#                                 & (shots_df.dec_time < relayoutData['xaxis.range[1]'])]
+#     elif "dragmode" in list(relayoutData.keys()) and selectedData:
+#         filtered_shots_df = shots_df[(shots_df.match_id == match_id)
+#                                 & (shots_df.dec_time > selectedData['range']['x'][0]) 
+#                                 & (shots_df.dec_time < selectedData['range']['x'][1])] 
+#     else:
+#         filtered_shots_df = shots_df[(shots_df.match_id == match_id)]
+#     return create_shot_plot(filtered_shots_df, match_info[match_id], theme)
+
 @app.callback(
             Output('spider', 'figure'),
-            [Input('xg_plot', 'selectedData'),
+            [Input('xg_plot', 'relayoutData'),
              Input('match_dropdown', 'value'),
              Input('theme_div', 'children')])
-def update_spider(selectedData, match_id, theme):
-    if selectedData:
+def update_spider(relayoutData, match_id, theme):
+    if "xaxis.range[0]" in list(relayoutData.keys()):
         filtered_shots_df = shots_df[(shots_df.match_id == match_id)
-                                & (shots_df.dec_time > selectedData['range']['x'][0]) 
-                                & (shots_df.dec_time < selectedData['range']['x'][1])]
+                                & (shots_df.dec_time > relayoutData['xaxis.range[0]']) 
+                                & (shots_df.dec_time < relayoutData['xaxis.range[1]'])]
         filtered_events = events[(events.match_id == match_id)
-                                & (events.minute >= selectedData['range']['x'][0]) 
-                                & (events.minute <= selectedData['range']['x'][1])]
+                                & (events.minute >= relayoutData['xaxis.range[0]']) 
+                                & (events.minute <= relayoutData['xaxis.range[1]'])]
         filtered_passing_df = passing_df[(passing_df.match_id == match_id)
-                                & (passing_df.minute >= selectedData['range']['x'][0]) 
-                                & (passing_df.minute <= selectedData['range']['x'][1])]
+                                & (passing_df.minute >= relayoutData['xaxis.range[0]']) 
+                                & (passing_df.minute <= relayoutData['xaxis.range[1]'])]
     else:
         filtered_shots_df = shots_df[(shots_df.match_id == match_id)]
         filtered_events = events[(events.match_id == match_id)]
@@ -1824,21 +1838,30 @@ def update_spider(selectedData, match_id, theme):
 
 # @app.callback(
 #             Output('spider', 'figure'),
-#             [Input('events_div', 'children'),
-#              Input('shots_div', 'children'),
-#              Input('passing_div', 'children'),
+#             [Input('xg_plot', 'selectedData'),
 #              Input('match_dropdown', 'value'),
 #              Input('theme_div', 'children')])
-# def update_spider(events, shots_df, passing_df, match_info, theme):
-#
-#     match_info = json.loads(match_info)
-#     events = pd.read_json(events)
-#     shots_df = pd.read_json(shots_df)
-#     passing_df = pd.read_json(passing_df)
-#     return create_spider_chart(events, shots_df, passing_df, match_info, theme)
+# def update_spider(selectedData, match_id, theme):
+#     if selectedData:
+#         filtered_shots_df = shots_df[(shots_df.match_id == match_id)
+#                                 & (shots_df.dec_time > selectedData['range']['x'][0]) 
+#                                 & (shots_df.dec_time < selectedData['range']['x'][1])]
+#         filtered_events = events[(events.match_id == match_id)
+#                                 & (events.minute >= selectedData['range']['x'][0]) 
+#                                 & (events.minute <= selectedData['range']['x'][1])]
+#         filtered_passing_df = passing_df[(passing_df.match_id == match_id)
+#                                 & (passing_df.minute >= selectedData['range']['x'][0]) 
+#                                 & (passing_df.minute <= selectedData['range']['x'][1])]
+#     else:
+#         filtered_shots_df = shots_df[(shots_df.match_id == match_id)]
+#         filtered_events = events[(events.match_id == match_id)]
+#         filtered_passing_df = passing_df[(passing_df.match_id == match_id)]
+
+#     return create_spider_chart(filtered_events, filtered_shots_df, filtered_passing_df, 
+#                                 match_info[match_id], theme)
 
 if __name__ == '__main__':
     app.run_server(
-            debug=True, 
-            port = 3000
+            # debug=True, 
+            port = 8080
         )
