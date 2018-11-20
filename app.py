@@ -105,22 +105,40 @@ team_colors = {
     'away': 'rgba(77,77,255, 1)'
 }
 
-event_dfs = []
-for match in matches.match_id.tolist():
-    df = (pd.read_json('./data/events/{}.json'.format(match), encoding='utf-8')
-          .assign(match_id = match))
-    event_dfs.append(df)
+# Importing match-wise events data and concatenating into master file
 
-events = (pd.concat(event_dfs, ignore_index=True, sort=False)
-            .query('minute < 120'))
+# event_dfs = []
+# for match in matches.match_id.tolist():
+#     df = (pd.read_json('./data/events/{}.json'.format(match), encoding='utf-8')
+#           .assign(match_id = match))
+#     event_dfs.append(df)
 
-shots = events[events.type.apply(lambda x: x['name']) == 'Shot']
+# events = pd.concat(event_dfs, ignore_index=True, sort=False)
+
+# keep_event_cols = ['location','minute','pass','period','play_pattern','player',
+#                      'possession','possession_team','second','shot','tactics','team',
+#                     ,'type','match_id','id']
+
+# (events[keep_event_cols]
+#  .assign(possession_team = lambda x: x['possession_team'].apply(lambda y: y['name']).astype('category'),
+#          play_pattern = lambda x: x['play_pattern'].apply(lambda y: y['name']).astype('category'),
+#          team = lambda x: x['team'].apply(lambda y: y['name']).astype('category'),
+#          event_type = lambda x: x['type'].apply(lambda y: y['name']).astype('category'),
+#          player_id = lambda x: x['player'].apply(lambda x: None if pd.isnull(x) else x['id']).astype('category'),
+#          player_name = lambda x: x['player'].apply(lambda x: None if pd.isnull(x) else x['name']).astype('category'))
+# .drop(['type','player'], 1)).to_json('events_disk.json', orient='table')
+
+# Read concatenated events file from disk
+events = (pd.read_json('./data/events/events_disk.json', orient='table', encoding='utf-8')
+                .query('minute < 120'))
+
+shots = events[events.event_type == 'Shot']
 
 shots_df = pd.DataFrame(
     list(zip(
-        shots.player.apply(lambda x: x['name']),
-        shots.player.apply(lambda x: x['id']),
-        shots.team.apply(lambda x: x['name']),
+        shots.player_name,
+        shots.player_id,
+        shots.team,
         shots.period,
         shots.minute,
         shots.second,
@@ -137,13 +155,13 @@ shots_df = pd.DataFrame(
                  'end_location','outcome','body_part','technique', 'possession',
                  'shot_id', 'match_id'])
 
-og = events[events.type.apply(lambda x: x['name']) == 'Own Goal Against']
+og = events[events.event_type == 'Own Goal Against']
 
 og_df = pd.DataFrame(
     list(zip(
-        og.player.apply(lambda x: x['name']),
-        og.player.apply(lambda x: x['id']),
-        og.possession_team.apply(lambda x: x['name']),
+        og.player_name,
+        og.player_id,
+        og.possession_team,
         og.period,
         og.minute,
         og.second,
@@ -185,22 +203,22 @@ shots_df.loc[:, 'team_type'] = shots_df.apply(lambda row: 'home' if row['team'] 
 shots_df.loc[:, 'shot_color'] = np.where(shots_df.outcome == 'Goal', 'black', shots_df.team_type.map(team_colors))
 
 # create passing dataframe
-passing = events[(events.type.apply(lambda x: x['name']) == 'Pass')]
+passing = events[events.event_type == 'Pass']
 
 pass_dic = {'id': None,
            'name': None}
 
 passing_df = pd.DataFrame(
                 list(zip(
-                    passing.player.apply(lambda x: x['name']),
-                    passing.player.apply(lambda x: x['id']),
+                    passing.player_name,
+                    passing.player_id,
                     passing.period,
                     passing.minute,
                     passing.second,
                     passing.location,
                     passing.location.apply(lambda x: x[0]),
                     passing.location.apply(lambda x: x[1]),
-                    passing.team.apply(lambda x: x['name']),
+                    passing.team,
                     passing['pass'].apply(lambda x: x.get('recipient', pass_dic)['id']),
                     passing['pass'].apply(lambda x: x.get('recipient', pass_dic)['name']),
                     passing['pass'].apply(lambda x: x['height']['name']),
@@ -265,32 +283,30 @@ disp_table = pass_stats.join(xg_stats).fillna(0).reset_index()
 
 # create location dataframe
 
-mask = (~events.play_pattern.apply(lambda x: x['name'])
-        .isin(['From Free Kick', 'From Corner']))
+mask = (~events.play_pattern.isin(['From Free Kick', 'From Corner']))
 
-location = events[mask & (pd.notnull(events.player)) & (pd.notnull(events.location))]
+location = events[mask & (pd.notnull(events.player_id)) & (pd.notnull(events.location))]
 
 location_df = pd.DataFrame(
                     list(zip(
-                        location.player.apply(lambda x: x['name']),
-                        location.player.apply(lambda x: x['id']),
+                        location.player_name,
+                        location.player_id,
                         location.period,
                         location.minute,
                         location.second,
                         location.location,
                         location.location.apply(lambda x: x[0]),
                         location.location.apply(lambda x: x[1]),
-                        location.team.apply(lambda x: x['name']),
-                        location.type.apply(lambda x: x['name']),
+                        location.team,
+                        location.event_type,
                         location.match_id
                         )), columns=['name','id','period','minute','seconds',
                                      'location','x_pos','y_pos','team','event','match_id'])
 
 # create lineup data
 
-lineups_df = (events.loc[events.type.apply(lambda x: x['name']) == 'Starting XI', 
+lineups_df = (events.loc[events.event_type == 'Starting XI', 
                       ['match_id','team','tactics']]
-              .assign(team = lambda x: x.team.apply(lambda y: y['name']))
               .merge(pd.melt(matches, id_vars=['match_id'], value_vars=['home','away'], 
                              var_name='team_type', value_name='team'),
                      how='left', on=['match_id','team']))
@@ -754,11 +770,11 @@ def create_spider_chart(events, shots_df, passing_df, match_info, theme):
     req_cols = ['Pressure','Dribble','Block','Foul Committed','Clearance','Foul Won','Interception','Dispossessed']
 
     overall_stats = (events
-                    .assign(team_name = lambda x: x['team'].apply(lambda y: y['name']),
-                            event_type = lambda x: x['type'].apply(lambda y: y['name']))
-                    .groupby('team_name')
-                    .event_type.value_counts()
+                    .assign(event_type = lambda x: x.event_type.astype(str))
+                    .groupby(['team', 'event_type'])
+                    .agg({'event_type': 'count'})
                     .unstack()
+                    ['event_type']
                     .loc[:, req_cols]
                     .rename_axis('team'))
 
