@@ -105,7 +105,10 @@ team_colors = {
     'away': 'rgba(77,77,255, 1)'
 }
 
-# Importing match-wise events data and concatenating into master file
+# # First time data handling
+# # Importing match-wise events data and concatenating into master file
+
+# matches = pd.read_json('./data/matches/43.json', encoding='utf-8')
 
 # event_dfs = []
 # for match in matches.match_id.tolist():
@@ -117,7 +120,7 @@ team_colors = {
 
 # keep_event_cols = ['location','minute','pass','period','play_pattern','player',
 #                      'possession','possession_team','second','shot','tactics','team',
-#                     ,'type','match_id','id']
+#                     'type','match_id','id']
 
 # (events[keep_event_cols]
 #  .assign(possession_team = lambda x: x['possession_team'].apply(lambda y: y['name']).astype('category'),
@@ -126,10 +129,10 @@ team_colors = {
 #          event_type = lambda x: x['type'].apply(lambda y: y['name']).astype('category'),
 #          player_id = lambda x: x['player'].apply(lambda x: None if pd.isnull(x) else x['id']).astype('category'),
 #          player_name = lambda x: x['player'].apply(lambda x: None if pd.isnull(x) else x['name']).astype('category'))
-# .drop(['type','player'], 1)).to_json('events_disk.json', orient='table')
+# .drop(['type','player'], axis=1)).to_json('./data/events/events_disk.json')
 
 # Read concatenated events file from disk
-events = (pd.read_json('./data/events/events_disk.json', orient='table', encoding='utf-8')
+events = (pd.read_json('./data/events/events_disk.json',  encoding='utf-8')
                 .query('minute < 120'))
 
 shots = events[events.event_type == 'Shot']
@@ -238,7 +241,8 @@ passing_df = pd.DataFrame(
                                  'outcome', 'match_id'])
 
 # create table stats dataframe
-xg_stats = (passing_df
+xg_stats = (pd.concat([
+             (passing_df
              .query('outcome != outcome')
              .merge(shots_df[['match_id','team','possession','xg','shot_id']],
                     how='inner',
@@ -246,17 +250,18 @@ xg_stats = (passing_df
              [['match_id','name','id','team','shot_id','is_shot_assist','is_goal_assist','possession','xg']]
              .assign(is_shot_assist = lambda x: np.where(x.is_shot_assist == 0, 0, 1),
                      is_buildup = lambda x: np.where(x.is_shot_assist == 0, 1, 0),
-                     is_shot = 0)
-             .append(shots_df[['match_id','name','id','team','possession','xg','shot_id']]
-                     .assign(is_shot = 1), ignore_index=True, sort=False)
+                     is_shot = 0)),
+             (shots_df[['match_id','name','id','team','possession','xg','shot_id']]
+                     .assign(is_shot = 1))]
+                     , ignore_index=True, sort=False)
              .groupby(['match_id','id','name','team','possession','shot_id'], as_index=False)
-             ['xg','is_shot_assist','is_goal_assist','is_buildup','is_shot'].max()
+             [['xg','is_shot_assist','is_goal_assist','is_buildup','is_shot']].max()
              .assign(xg_contribution = lambda x: x.xg,
                      xg_buildup = lambda x: x.xg * x.is_buildup,
                      xg_assist = lambda x: x.xg * x.is_shot_assist,
                      xg_shot= lambda x: x.xg * x.is_shot)
              .groupby(['match_id','id','name','team'])
-             ['xg_contribution','xg_buildup','xg_assist','xg_shot']
+             [['xg_contribution','xg_buildup','xg_assist','xg_shot']]
              .sum())
 
 comp_passes = lambda x: np.sum(np.where(x.isnull(), 1, 0))
@@ -771,21 +776,26 @@ def create_spider_chart(events, shots_df, passing_df, match_info, theme):
 
     overall_stats = (events
                     .assign(event_type = lambda x: x.event_type.astype(str))
+                    .query('event_type == @req_cols')
                     .groupby(['team', 'event_type'])
                     .agg({'event_type': 'count'})
                     .unstack()
                     ['event_type']
-                    .loc[:, req_cols]
+                    .loc[:, :]
                     .rename_axis('team'))
+    
+    missing_events = set(req_cols) - set(overall_stats.columns.values.tolist())
+    for missing_event in missing_events:
+        overall_stats.loc[:, missing_event] = 0
 
     shooting_stats = (shots_df
                       .groupby('team')
-                      .agg({
-                          'xg': 'sum',
-                          'outcome': {'goals': lambda x: np.sum(np.where(x == 'Goal', 1, 0)),
-                                      'sog': lambda x: np.sum(np.where(x.isin(['Goal','Post','Saved']), 1, 0))},
-                          'body_part': lambda x: np.sum(np.where(x == 'Head', 1, 0))
-                      }))
+                      .agg(
+                          xg = ('xg', 'sum'),
+                          goals = ('outcome', lambda x: np.sum(np.where(x == 'Goal', 1, 0))),
+                          sog = ('outcome', lambda x: np.sum(np.where(x.isin(['Goal','Post','Saved']), 1, 0))),
+                          headers = ('body_part', lambda x: np.sum(np.where(x == 'Head', 1, 0)))
+                      ))
 
     shooting_stats.columns = ['xg','goals','sog','headers']
 
@@ -797,9 +807,9 @@ def create_spider_chart(events, shots_df, passing_df, match_info, theme):
                  .transpose()
                  .assign(angle = lambda x: x.index.map(lambda x: radar_angles[x]).values)
                  .sort_values('angle')
-                 .drop('angle', 1))
+                 .drop('angle', axis=1))
 
-    plot_stats = (team_stats.div(team_stats.sum(axis=1), axis=0)
+    plot_stats = (team_stats.div(team_stats.sum(axis=1).replace(0, 1), axis=0)
                   .fillna(0))
 
     plot_stats = (plot_stats
@@ -1265,11 +1275,11 @@ def create_map_traces(team, positions, pass_combinations, starting, match_info):
     comb_team = (pass_combinations[(pass_combinations.player_1.isin(starting[team])) &
                      (pass_combinations.player_2.isin(starting[team]))]
                  .merge(position_team[['id','name','x_pos','y_pos']], left_on='player_1', right_on='id', how='left')
-                 .drop('id', 1)
+                 .drop('id', axis=1)
                  .rename(columns={'name': 'player_1_name','x_pos': 'player_1_x_pos', 'y_pos': 'player_1_y_pos'})
                  .merge(position_team[['id','name','x_pos','y_pos']], left_on='player_2', right_on='id', how='left')
                  .rename(columns={'name': 'player_2_name','x_pos': 'player_2_x_pos', 'y_pos': 'player_2_y_pos'})
-                 .drop('id', 1))
+                 .drop('id', axis=1))
 
     line_team = []
     for idx, row in comb_team.iterrows():
