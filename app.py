@@ -11,9 +11,9 @@ from plotly.offline import plot
 import plotly.graph_objs as go
 
 import dash
-import dash_core_components as dcc
-import dash_html_components as html
-import dash_table as table
+from dash import dcc
+from dash import html
+from dash import dash_table as table
 
 from dash.dependencies import Input, Output
 
@@ -1502,7 +1502,7 @@ server = app.server
 
 app.title = 'WC 2018 MATCH EXPLORER'
 
-app.css.append_css({"external_url": "https://codepen.io/hkhare42/pen/eQzWNy.css"})
+# app.css.append_css({"external_url": "https://codepen.io/hkhare42/pen/eQzWNy.css"})
 
 app.layout = html.Div(id='bodydiv', children = [
                     html.Header(
